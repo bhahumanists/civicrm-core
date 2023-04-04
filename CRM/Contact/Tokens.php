@@ -466,6 +466,11 @@ class CRM_Contact_Tokens extends CRM_Core_EntityTokens {
           $customFields['custom_' . $fieldSpec['custom_field_id']] = $fieldSpec['name'];
         }
       }
+      //HUK-03
+      if ($fieldSpec['type'] === 'Custom') {
+        $customFields['custom_' . $fieldSpec['custom_field_id']] = $fieldSpec['name'];
+      }
+      //HUK-03
       $returnProperties[] = $prefix . $this->getMetadataForField($field)['name'];
     }
 
