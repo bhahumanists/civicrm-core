@@ -154,6 +154,9 @@ class TokenProcessor {
     $this->visitTokens($value ?: '', function (?string $fullToken, ?string $entity, ?string $field, ?array $modifier) use (&$tokens) {
       $tokens[$entity][] = $field;
     });
+    //HUMANIST UK EDIT - START
+    $tokens = \CRM_Mailingspreview_Utils::smartyTokensCheck($value, $tokens);
+    //HUMANIST UK EDIT - END
     $this->messages[$name] = [
       'string' => $value,
       'format' => $format,
