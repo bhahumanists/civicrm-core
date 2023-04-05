@@ -1,5 +1,18 @@
 /* CiviCRM Print Media Stylesheet */
 
+@font-face {
+  font-family: "Calibri";
+  font-size: 14px;
+}
+
+
+body {
+  /* Font */
+  font-family: Calibri;
+  font-size: 14px;
+}
+
+
 /* Hide any buttons or other form items when printing*/
 #crm-container .buttons,
 #crm-container .crm-submit-buttons,
@@ -20,7 +33,7 @@ table.form-layout th {
 }
 #crm-container {
   overflow: visible !important;
-  font-family: DejaVu Sans, serif;
+  font-family: Calibri, serif;
   margin: 0px 10px 0px 10px;
 }
 
