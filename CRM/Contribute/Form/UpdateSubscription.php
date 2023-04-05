@@ -201,7 +201,7 @@ class CRM_Contribute_Form_UpdateSubscription extends CRM_Contribute_Form_Contrib
 
     if ($this->isSelfService() && $this->_donorEmail) {
       // for self service force notify
-      $params['is_notify'] = 1;
+      $params['is_notify'] = 0; //HUK-10
     }
 
     // if this is an update of an existing recurring contribution, pass the ID

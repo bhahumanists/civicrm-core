@@ -204,7 +204,7 @@ class CRM_Contribute_Form_CancelSubscription extends CRM_Contribute_Form_Contrib
       }
 
       if (!empty($this->_donorEmail)) {
-        $params['is_notify'] = 1;
+        $params['is_notify'] = 0; //HUK-10
       }
     }
 

@@ -584,7 +584,9 @@ class CRM_Contribute_BAO_ContributionPage extends CRM_Contribute_DAO_Contributio
         $template->assign('updateSubscriptionUrl', $url);
       }
 
-      [$sent] = CRM_Core_BAO_MessageTemplate::sendTemplate($templatesParams);
+      //HUK-10
+      //[$sent] = CRM_Core_BAO_MessageTemplate::sendTemplate($templatesParams);
+      $sent = true;
 
       if ($sent) {
         CRM_Core_Error::debug_log_message('Success: mail sent for recurring notification.');
