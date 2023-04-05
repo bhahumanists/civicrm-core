@@ -203,7 +203,7 @@
           },
           ajax: {
             url: CRM.url('civicrm/ajax/rest'),
-            quietMillis: 300,
+            quietMillis: 4000, //HUK-48
             data: function(input, page_num) {
               if (page_num <= 1) {
                 rcpAjaxState = {
