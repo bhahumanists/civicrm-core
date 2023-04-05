@@ -8,7 +8,7 @@
  +--------------------------------------------------------------------+
 *}
 {if empty($urlIsPublic)}
-  <div class="footer" id="access">
+  <div class="footer" id="access" style="clear:both;"><!--HUK-29-->
     {capture assign='accessKeysHelpTitle'}{ts}Access Keys{/ts}{/capture}
     {ts}Access Keys:{/ts}
     {help id='accesskeys' file='CRM/common/accesskeys' title=$accessKeysHelpTitle}
