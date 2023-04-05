@@ -6,6 +6,19 @@ It could perhaps be thinned by 30-60% by making more directives.
 -->
 <div class="crm-block" ng-form="subform" crm-ui-id-scope>
   <div class="crm-group">
+    <!--BHA EDIT HUK-20------------------------------------>
+    <div class="crm-section selectMailingStyle">
+      <div class="label">
+        <label crm-depth="1">
+          <span>Humanists UK: Select Mailing Style</span>
+        </label>
+      </div>
+      <div class="content">
+        <div class="mailingStyleList"></div>
+      </div>
+      <div class="clear"></div>
+    </div>
+    <!--/BHA EDIT HUK-20------------------------------------>
     <div crm-ui-field="{name: 'subform.msg_template_id', title: ts('Template')}" ng-if="mailing.template_type=='traditional'">
       <div crm-mailing-block-templates="{name: 'templates', id: 'subform.msg_template_id'}" crm-mailing="mailing"></div>
     </div>
@@ -16,6 +29,7 @@ It could perhaps be thinned by 30-60% by making more directives.
           crm-ui-select="{dropdownAutoWidth : true, allowClear: false, placeholder: ts('Email address')}"
           name="fromAddress"
           ng-model="fromPlaceholder.label"
+          ui-jq="select2"
           required>
           <option value=""></option>
           <option ng-repeat="frm in crmFromAddresses.getAll() | filter:{is_active:1} | orderBy:'weight'" value="{{frm.label}}">{{frm.label}}</option>
@@ -36,6 +50,20 @@ It could perhaps be thinned by 30-60% by making more directives.
         </select>
       </div>
     </div>
+    <!--BHA EDIT HUK-20------------------------------------>
+    <div class="crm-section selectMailingType">
+      <div class="label">
+        <label crm-depth="1">
+          <span>Humanists UK: Select Mailing Type</span>
+        </label>
+      </div>
+      <div class="content">
+        <div class="mailingTypeList"></div>
+        <div class="warning"></div>
+      </div>
+      <div class="clear"></div>
+    </div>
+    <!--/BHA EDIT HUK-20------------------------------------>
     <div crm-ui-field="{name: 'subform.recipients', title: ts('Recipients'), required: true}">
       <div crm-mailing-block-recipients="{name: 'recipients', id: 'subform.recipients'}" crm-mailing="mailing" cm-ui-id="subform.recipients"></div>
     </div>
