@@ -864,8 +864,8 @@ SELECT civicrm_case.id, case_status.label AS case_status, status_id, civicrm_cas
     $query = '
     SELECT  rel.id as civicrm_relationship_id,
             con.sort_name as sort_name,
-            civicrm_email.email as email,
-            civicrm_phone.phone as phone,
+            #civicrm_email.email as email,
+            #civicrm_phone.phone as phone,
             con.id as civicrm_contact_id,
             rel.is_active as is_active,
             rel.end_date as end_date,
@@ -875,8 +875,8 @@ SELECT civicrm_case.id, case_status.label AS case_status, status_id, civicrm_cas
       FROM  civicrm_relationship rel
  INNER JOIN  civicrm_relationship_type ON rel.relationship_type_id = civicrm_relationship_type.id
  INNER JOIN  civicrm_contact con ON ((con.id <> %1 AND con.id IN (rel.contact_id_a, rel.contact_id_b)) OR (con.id = %1 AND rel.contact_id_b = rel.contact_id_a AND rel.contact_id_a = %1 AND rel.is_active))
- LEFT JOIN  civicrm_phone ON (civicrm_phone.contact_id = con.id AND civicrm_phone.is_primary = 1)
- LEFT JOIN  civicrm_email ON (civicrm_email.contact_id = con.id AND civicrm_email.is_primary = 1)
+ #LEFT JOIN  civicrm_phone ON (civicrm_phone.contact_id = con.id AND civicrm_phone.is_primary = 1)
+ #LEFT JOIN  civicrm_email ON (civicrm_email.contact_id = con.id AND civicrm_email.is_primary = 1)
      WHERE  (rel.contact_id_a = %1 OR rel.contact_id_b = %1) AND rel.case_id = %2
        AND con.is_deleted = 0';
 
@@ -897,19 +897,46 @@ SELECT civicrm_case.id, case_status.label AS case_status, status_id, civicrm_cas
     $dao = CRM_Core_DAO::executeQuery($query, $params);
 
     $values = [];
+    $contactsToLookUp = [];
     while ($dao->fetch()) {
       $rid = $dao->civicrm_relationship_id;
       $values[$rid]['cid'] = $dao->civicrm_contact_id;
       $values[$rid]['relation'] = $dao->relation;
       $values[$rid]['sort_name'] = $dao->sort_name;
-      $values[$rid]['email'] = $dao->email;
-      $values[$rid]['phone'] = $dao->phone;
       $values[$rid]['is_active'] = $dao->is_active;
       $values[$rid]['end_date'] = $dao->end_date;
       $values[$rid]['relation_type'] = $dao->relation_type;
       $values[$rid]['rel_id'] = $dao->civicrm_relationship_id;
       $values[$rid]['client_id'] = $contactID;
       $values[$rid]['relationship_direction'] = $dao->relationship_direction;
+
+      $contactsToLookUp[] = $dao->civicrm_contact_id;
+    }
+
+    try {
+      //quicker to get the emails individually then to
+      $email = \Civi\Api4\Email::get(FALSE)
+                               ->addSelect('email', 'contact_id')
+                               ->addWhere('contact_id', 'IN', $contactsToLookUp)
+                               ->addWhere('is_primary', '=', TRUE)
+                               ->setLimit(count($contactsToLookUp))
+                               ->execute()->indexBy('contact_id')->getArrayCopy();
+
+
+      $phone = \Civi\Api4\Phone::get(FALSE)
+                               ->addSelect('phone', 'contact_id')
+                               ->addWhere('contact_id', '=', $contactsToLookUp)
+                               ->addWhere('is_primary', '=', TRUE)
+                               ->setLimit(count($contactsToLookUp))
+                               ->execute()->indexBy('contact_id')->getArrayCopy();
+
+    } catch (API_Exception $e) {
+    }
+
+    //quicker to look up the emails and phone separately than to do it in the first query
+    foreach ($values as $rid => $data) {
+      $values[$rid]['email'] = $email[$data['cid']]['email'] ?? null;
+      $values[$rid]['phone'] = $phone[$data['cid']]['phone'] ?? null;
     }
 
     return $values;
