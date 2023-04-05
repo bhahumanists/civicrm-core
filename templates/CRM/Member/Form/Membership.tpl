@@ -801,6 +801,165 @@
     cj('#financial_type_id').val(setContributionType);
     }
   }
+
+  //HUMANISTS UK HUK-30
+  jQuery(document).ready(function ($) {
+
+    //disable old membership types unless one is selected
+    var memType = $('#membership_type_id_1').val();
+    if (memType != 19 && memType != 13 && memType != 1 && memType != 3 && memType != 15 && memType != 20 && memType != 4) {
+      CRM.$('#membership_type_id_1 option[value="19"]').attr("disabled", "disabled");
+      CRM.$('#membership_type_id_1 option[value="13"]').attr("disabled", "disabled");
+      CRM.$('#membership_type_id_1 option[value="1"]').attr("disabled", "disabled");
+      CRM.$('#membership_type_id_1 option[value="3"]').attr("disabled", "disabled");
+      CRM.$('#membership_type_id_1 option[value="15"]').attr("disabled", "disabled");
+      CRM.$('#membership_type_id_1 option[value="20"]').attr("disabled", "disabled");
+      CRM.$('#membership_type_id_1 option[value="4"]').attr("disabled", "disabled");
+      CRM.$('#membership_type_id_1 option[value="11"]').attr("disabled", "disabled");
+    }
+
+    //move focus on DD fields
+    $('body').on('input', '#multiple_block #block_1', function() {
+      var txt = $(this).val();
+      if (txt.length == 2) {
+        $('#multiple_block #block_2').focus();
+      }
+    });
+
+    $('body').on('input', '#multiple_block #block_2', function() {
+      var txt = $(this).val();
+      if (txt.length == 2) {
+        $('#multiple_block #block_3').focus();
+      }
+    });
+
+    //tick the autorenew checkbox whenever we select a full annual or full monthly memtype
+    $('body').on('change', '#membership_type_id_1', function() {
+      var pp = $(this).val();
+      var paymentType = $('#payment_processor_id').val();
+      if (paymentType != 5 && paymentType != 17 && (pp == 54 || pp == 55)) {
+        $('#auto_renew').prop('checked',true).trigger('change');
+      }
+
+      if (pp == 55) {
+
+        // //update the custom membership amount
+        // var memAmt = $('#custom_924_-1').val();
+        // setTimeout(function(){
+        //     var initialAmt = $('#total_amount').val();
+        //     $('#custom_924_-1').val(initialAmt);
+        // }, 3500);
+
+        //set the payment to DD
+        //this doesn't trigger the new billing fields, annoyingly
+        //$('#payment_processor_id').val(11).trigger('change');
+      }
+    });
+
+    //prevent auto-renew being ticked when credit card type selected
+    $('body').on('input', '#auto_renew', function() {
+      var paymentType = $('#payment_processor_id').val();
+      if ((paymentType == 5 || paymentType == 17) && $(this).is(":checked")) {
+        alert('Cannot use auto-renew with a credit card membership');
+        $(this).prop('checked', false).trigger('change');
+      }
+    });
+
+    //update total amount whenever custom mem amount changed
+    $('body').on('input', '#custom_924_-1', function() {
+      var txt = $(this).val();
+      $('#total_amount').val(txt);
+    });
+
+    //update custom mem amount whenever total amount changed
+    $('body').on('keyup', '#total_amount', function() {
+      var txt = $(this).val();
+      $('#custom_924_-1').val(txt);
+    });
+
+    //update custom mem amount when appropriate membership type selected
+    $('body').on('change', '#membership_type_id_1', function() {
+
+      //update the custom membership amount
+      var initialAmt = $('#total_amount').val();
+      setTimeout(function(){
+        $('#custom_924_-1').val(initialAmt);
+      }, 2000);
+
+      //make sure we aren't trying to set up a monthly membership using credit card
+      var memType = $(this).val();
+      var paymentType = $('#payment_processor_id').val();
+      if (memType == 55 && paymentType == 5) {
+        alert('Cannot set Full Monthly membership using Credit or Debit Card');
+        $(this).val(0).trigger('change');
+      }
+
+    });
+
+    //remove some options
+    // CRM.$("#membership_type_id_1 option[value='1'").remove();
+    // CRM.$("#membership_type_id_1 option[value='19'").remove();
+    // CRM.$("#membership_type_id_1 option[value='13'").remove();
+    // CRM.$("#membership_type_id_1 option[value='3'").remove();
+    // CRM.$("#membership_type_id_1 option[value='15'").remove();
+    // CRM.$("#membership_type_id_1 option[value='20'").remove();
+    // CRM.$("#membership_type_id_1 option[value='4'").remove();
+
+    //tick auto renew checkbox when payment processor id selected
+    $('body').on('change', '#payment_processor_id', function() {
+      var pp = $(this).val();
+      if (pp == 13 || pp == 11) {
+        $('#auto_renew').prop('checked',true).trigger('change');
+      } else if (pp == 5) {
+        $('#auto_renew').prop('checked',false).trigger('change');
+      }
+
+      //make sure we aren't trying to set up a monthly membership using credit card
+      var memType = $('#membership_type_id_1').val();
+      if (memType == 55 && pp  == 5) {
+        alert('Cannot set Full Monthly membership using Credit or Debit Card');
+        $('#membership_type_id_1').val(0).trigger('change');
+      }
+
+      if (pp == 11 || pp == 13) {
+        checkDD();
+      }
+
+    });
+
+    //initial check for whether there is a DD in place
+    var pp = $('#payment_processor_id').val();
+    if (pp == 11 || pp == 13) {
+      checkDD();
+    }
+
+    var ddChecked = false;
+    function checkDD()
+    {
+      if (ddChecked == true) return;
+      CRM.api3('ContributionRecur', 'getcount', {
+        "sequential": 1,
+        "payment_processor_id": 11,
+        "contribution_status_id": {"IN": ["In Progress", "Pending"]},
+        "contact_id": contactID,
+      }).done(function (result) {
+        if (result.result > 0) {
+          str = "<br /><small style='color:red;'>There is already a DD in place. You almost certainly want to use 'Add to an existing Direct Debit'</small>";
+        } else {
+          str = "<br /><small style='color:green;'>There is no DD currently set up</small>";
+        }
+        $('#payment_processor_id').after(str);
+        ddChecked = true;
+      });
+    }
+
+
+
+//# sourceURL=memextra.js
+
+
+  });
+
   </script>
   {/literal}
   {/if} {* closing of delete check if *}

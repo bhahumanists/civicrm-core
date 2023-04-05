@@ -278,4 +278,13 @@
       }
     }
   </script>
+
+  <script>
+
+    //HUMANISTS UK HUK-30 (can't use extra tpl because it's an ajax popup)
+    jQuery(document).ready(function() {
+      CRM.$('#record_contribution').trigger("click");
+    });
+
+  </script>
 {/literal}
