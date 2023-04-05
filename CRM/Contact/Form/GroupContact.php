@@ -102,6 +102,7 @@ class CRM_Contact_Form_GroupContact extends CRM_Core_Form {
       $groupSelect = $groupHierarchy;
     }
 
+    $groupSelect = CRM_Contactrecords_BAO_UICustomisations::removeSmartGroupsFromListOfGroups($groupSelect); //HUK-11
     $groupSelect = ['' => ts('- select group -')] + $groupSelect;
 
     if (count($groupSelect) > 1) {

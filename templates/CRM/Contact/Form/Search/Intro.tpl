@@ -18,7 +18,7 @@
       {help id="id-edit-smartGroup"}
   {/if}
 
-  {if $permissionedForGroup}
+  {if $permissionedForGroup && empty($ssID)} <!--HUK-11-->
     {capture assign=addMembersURL}{crmURL q="context=amtg&amtgID=`$group.id`&reset=1"}{/capture}
       <a href="{$addMembersURL}" class="button no-popup"><span><i class="crm-i fa-user-plus" aria-hidden="true"></i> {ts 1=$group.title}Add Contacts to %1{/ts}</span></a>
       {if $ssID}{help id="id-add-to-smartGroup"}{/if}

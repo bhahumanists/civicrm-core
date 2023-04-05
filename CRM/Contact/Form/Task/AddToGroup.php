@@ -107,6 +107,7 @@ class CRM_Contact_Form_Task_AddToGroup extends CRM_Contact_Form_Task {
 
     // add select for groups
     $group = ['' => ts('- select group -')] + CRM_Core_PseudoConstant::nestedGroup();
+    $group = CRM_Contactrecords_BAO_UICustomisations::removeSmartGroupsFromListOfGroups($group); //HUK-11
 
     $groupElement = $this->add('select', 'group_id', ts('Select Group'), $group, FALSE, ['class' => 'crm-select2 huge']);
 
