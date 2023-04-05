@@ -464,7 +464,7 @@ class CRM_Core_I18n_SchemaStructure {
             'type' => "Text",
           ],
           'receipt_text' => [
-            'type' => "TextArea",
+            'type' => "RichTextEditor", //HUK-28
             'rows' => "6",
             'cols' => "50",
           ],
