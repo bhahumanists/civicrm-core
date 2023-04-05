@@ -1575,6 +1575,30 @@ class CRM_Utils_Date {
 
       case 'month':
         switch ($relativeTerm) {
+
+          //HUK-07
+          case 'ago_6':
+            $from['d'] = 1;
+            $from['M'] = $to['M'] = date("n",strtotime("-6 months"));
+            $from['Y'] = $to['Y'] = date("Y",strtotime("-6 months"));
+            $to['d']   = date('t', mktime(0, 0, 0, date("m",strtotime("-6 months")), 1, date("Y",strtotime("-6 months"))));
+            break;
+
+          case 'ago_3':
+            $from['d'] = 1;
+            $from['M'] = $to['M'] = date("n",strtotime("-3 months"));
+            $from['Y'] = $to['Y'] = date("Y",strtotime("-3 months"));
+            $to['d']   = date('t', mktime(0, 0, 0, date("m",strtotime("-3 months")), 1, date("Y",strtotime("-3 months"))));
+            break;
+
+          case 'ago_1': //duplicates 'previous', but makes it clearer for renewals process
+            $from['d'] = 1;
+            $from['M'] = $to['M'] = date("n",strtotime("-1 months"));
+            $from['Y'] = $to['Y'] = date("Y",strtotime("-1 months"));
+            $to['d']   = date('t', mktime(0, 0, 0, date("m",strtotime("-1 months")), 1, date("Y",strtotime("-1 months"))));
+            break;
+            //END HUK-07
+
           case 'this':
             $from['d'] = 1;
             $to['d'] = date('t', mktime(0, 0, 0, $now['mon'], 1, $now['year']));
