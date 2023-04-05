@@ -609,7 +609,13 @@ class CRM_Activity_BAO_Activity extends CRM_Activity_DAO_Activity {
         $activityParams['return'][] = $attr;
       }
     }
-    $result = civicrm_api3('Activity', 'Get', $activityParams)['values'];
+    //HUMANISTS UK EDIT HUK-02 START
+    if (class_exists('CRM_Coreoverrides_Functions')) {
+      $result = CRM_Coreoverrides_Functions::humanistsuk02_activity_search_speed($activityParams, $params);
+    } else {
+      $result = civicrm_api3('Activity', 'get', $activityParams)['values'];
+    }
+    //HUMANISTS UK EDIT HUK-02 END
 
     $bulkActivityTypeID = CRM_Core_PseudoConstant::getKey('CRM_Activity_BAO_Activity', 'activity_type_id', 'Bulk Email');
     $allCampaigns = CRM_Campaign_BAO_Campaign::getCampaigns(NULL, NULL, FALSE, FALSE, FALSE, TRUE);
