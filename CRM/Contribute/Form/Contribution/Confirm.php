@@ -2718,6 +2718,11 @@ class CRM_Contribute_Form_Contribution_Confirm extends CRM_Contribute_Form_Contr
     $currentMembership = CRM_Member_BAO_Membership::getContactMembership($contactID, $membershipTypeID,
       $is_test, $membershipID, TRUE
     );
+    //HUMANISTS UK HUK-05 START
+    if ($currentMembership && !$currentMembership['is_current_member']) {
+      $currentMembership = NULL;
+    }
+    //HUMANISTS UK HUK-05 END
     if ($currentMembership) {
       $renewalMode = TRUE;
 
