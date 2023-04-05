@@ -90,7 +90,7 @@ class CRM_Mailing_Event_BAO_MailingEventClickThrough extends CRM_Mailing_Event_D
     $open->time_stamp = date('YmdHis');
     $open->save();
 
-    return $search->url;
+    return trim($search->url);
   }
 
   /**
