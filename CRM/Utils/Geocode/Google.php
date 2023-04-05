@@ -53,10 +53,11 @@ class CRM_Utils_Geocode_Google {
 
     $add = '';
 
-    if (!empty($values['street_address'])) {
-      $add = urlencode(str_replace('', '+', $values['street_address']));
-      $add .= ',+';
-    }
+    //HUK-15
+//    if (!empty($values['street_address'])) {
+//      $add = urlencode(str_replace('', '+', $values['street_address']));
+//      $add .= ',+';
+//    }
 
     $city = $values['city'] ?? NULL;
     if ($city) {
@@ -64,29 +65,30 @@ class CRM_Utils_Geocode_Google {
       $add .= ',+';
     }
 
-    if (!empty($values['state_province']) || (!empty($values['state_province_id']) && $values['state_province_id'] != 'null')) {
-      if (!empty($values['state_province_id'])) {
-        $stateProvince = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_StateProvince', $values['state_province_id']);
-      }
-      else {
-        if (!$stateName) {
-          $stateProvince = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_StateProvince',
-            $values['state_province'],
-            'name',
-            'abbreviation'
-          );
-        }
-        else {
-          $stateProvince = $values['state_province'];
-        }
-      }
+    //HUK-15
+//    if (!empty($values['state_province']) || (!empty($values['state_province_id']) && $values['state_province_id'] != 'null')) {
+//      if (!empty($values['state_province_id'])) {
+//        $stateProvince = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_StateProvince', $values['state_province_id']);
+//      }
+//      else {
+//        if (!$stateName) {
+//          $stateProvince = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_StateProvince',
+//            $values['state_province'],
+//            'name',
+//            'abbreviation'
+//          );
+//        }
+//        else {
+//          $stateProvince = $values['state_province'];
+//        }
+//      }
 
       // dont add state twice if replicated in city (happens in NZ and other countries, CRM-2632)
-      if ($stateProvince != $city) {
-        $add .= '+' . urlencode(str_replace('', '+', $stateProvince));
-        $add .= ',+';
-      }
-    }
+//      if ($stateProvince != $city) {
+//        $add .= '+' . urlencode(str_replace('', '+', $stateProvince));
+//        $add .= ',+';
+//      }
+//    }
 
     if (!empty($values['postal_code'])) {
       $add .= '+' . urlencode(str_replace('', '+', $values['postal_code']));
@@ -94,7 +96,8 @@ class CRM_Utils_Geocode_Google {
     }
 
     if (!empty($values['country'])) {
-      $add .= '+' . urlencode(str_replace('', '+', $values['country']));
+      CRM_Coreoverrides_Functions::humanistsuk15_fix_isle_of_man($add, $values); //HUK-15
+      //$add .= '+' . urlencode(str_replace('', '+', $values['country']));
     }
 
     $coord = self::makeRequest($add);
