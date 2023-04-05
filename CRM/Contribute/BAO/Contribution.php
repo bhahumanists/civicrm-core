@@ -3251,7 +3251,7 @@ INNER JOIN civicrm_activity ON civicrm_activity_contact.activity_id = civicrm_ac
       'Refunded' => ['Cancelled', 'Completed'],
       'Partially paid' => ['Completed'],
       'Pending refund' => ['Completed', 'Refunded'],
-      'Failed' => ['Pending'],
+      'Failed' => ['Pending', 'Failed and Processed'], //HUK-06
     ];
     $validNewStatues = $checkStatus[$oldContributionStatus] ?? [];
 
