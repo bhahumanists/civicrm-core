@@ -73,7 +73,7 @@ function smarty_function_help($params, &$smarty) {
   }
 
   // Escape for html
-  $title = htmlspecialchars(ts('%1 Help', [1 => $name]));
+  $title = htmlspecialchars(ts('%1', [1 => $name])); //HUK-16
   // Escape for html and js
   $name = htmlspecialchars(json_encode($name), ENT_QUOTES);
 

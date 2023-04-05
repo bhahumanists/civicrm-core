@@ -51,7 +51,7 @@
                 <table class="crm-info-panel">
                   {foreach from=$cd_edit.fields item=element key=field_id}
                     <tr>
-                      <td class="label">{$element.field_title}</td>
+                      <td class="label">{$element.field_title}  {if $element.help_post}{help id=$element.id file="CRM/Custom/Form/CustomField.hlp" title=$element.help_post}{/if}</td> <!--HUK-16-->
                       <td class="html-adjust">
                         {if $element.options_per_line != 0}
                           {* sort by fails for option per line. Added a variable to iterate through the element array*}
