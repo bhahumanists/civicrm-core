@@ -2780,18 +2780,33 @@ AND    e.id NOT IN ( SELECT email_id FROM civicrm_mailing_recipients mr WHERE ma
       $where .= " civicrm_mailing.sms_provider_id IS NOT NULL ";
     }
 
+    //HUK-47
+//    if (empty($list)) {
+//      $query = "
+//SELECT civicrm_mailing.id, civicrm_mailing.name, civicrm_mailing_job.end_date
+//FROM   civicrm_mailing
+//INNER JOIN civicrm_mailing_job ON civicrm_mailing.id = civicrm_mailing_job.mailing_id {$where}
+//ORDER BY civicrm_mailing.name";
+//      $mailing = CRM_Core_DAO::executeQuery($query);
+//
+//      while ($mailing->fetch()) {
+//        $list[$mailing->id] = "{$mailing->name} :: {$mailing->end_date}";
+//      }
+//    }
+
     if (empty($list)) {
       $query = "
-SELECT civicrm_mailing.id, civicrm_mailing.name, civicrm_mailing_job.end_date
+SELECT civicrm_mailing.id, civicrm_mailing.name, civicrm_mailing.scheduled_date
 FROM   civicrm_mailing
-INNER JOIN civicrm_mailing_job ON civicrm_mailing.id = civicrm_mailing_job.mailing_id {$where}
+{$where} and is_archived = 0
 ORDER BY civicrm_mailing.name";
       $mailing = CRM_Core_DAO::executeQuery($query);
 
       while ($mailing->fetch()) {
-        $list[$mailing->id] = "{$mailing->name} :: {$mailing->end_date}";
+        $list[$mailing->id] = "{$mailing->name} :: {$mailing->scheduled_date}";
       }
     }
+
 
     return $list;
   }
