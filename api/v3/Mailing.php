@@ -562,9 +562,15 @@ function civicrm_api3_mailing_preview($params) {
     $details = $details[$contactID];
   }
 
-  $mime = $mailing->compose(NULL, NULL, NULL, $contactID, $fromEmail, $fromEmail,
+  //HUK-43
+//  $mime = $mailing->compose(NULL, NULL, NULL, $contactID, $fromEmail, $fromEmail,
+//    TRUE, $details, $attachments
+//  );
+
+  $mime = $mailing->compose(NULL, 100000000, NULL, $contactID, $fromEmail, $fromEmail,
     TRUE, $details, $attachments
   );
+
 
   return civicrm_api3_create_success([
     'id' => $mailingID,
