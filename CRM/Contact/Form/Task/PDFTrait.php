@@ -261,7 +261,16 @@ trait CRM_Contact_Form_Task_PDFTrait {
     $fileName = $this->getFileName();
 
     if ($type === 'pdf') {
-      CRM_Utils_PDF_Utils::html2pdf($html, $fileName . '.pdf', FALSE, $formValues);
+      $format   = CRM_Utils_PDF_Utils::getPDFformat($formValues);
+      $html     = CRM_Utils_PDF_Utils::getProcessedHTML($html, $format);
+      CRM_Utils_PDF_Utils::html2pdf($html, $fileName . '.pdf', FALSE, $format);
+    }
+    elseif ($type === 'html') { //HUK-32
+      $fileName = "CiviLetter.html";
+      $format   = CRM_Utils_PDF_Utils::getPDFformat($formValues);
+      $html     = CRM_Utils_PDF_Utils::getProcessedHTML($html, $format);
+      CRM_Utils_System::setHttpHeader('Content-Disposition', 'attachment; filename="' . $fileName);
+      echo $html;
     }
     elseif (!empty($formValues['document_file_path'])) {
       $fileName = pathinfo($formValues['document_file_path'], PATHINFO_FILENAME) . '.' . $type;
