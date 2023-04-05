@@ -81,13 +81,8 @@
         {if !empty($form.postal_code.html)}
           <div class="crm-field-wrapper">
             {$form.postal_code.label}
-            <input type="checkbox" id="postal-code-range-toggle" value="1"/>
-            <label for="postal-code-range-toggle">{ts}Range{/ts}</label><br />
             <div class="postal_code-wrapper">
               {$form.postal_code.html}
-            </div>
-            <div class="postal_code_range-wrapper" style="display: none;">
-              {$form.postal_code_low.html}&nbsp;-&nbsp;{$form.postal_code_high.html}
             </div>
           </div>
           <script type="text/javascript">
