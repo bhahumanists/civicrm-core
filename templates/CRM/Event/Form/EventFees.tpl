@@ -243,3 +243,14 @@
 {/if}
 
 {* ADD mode if *}
+{* ADD mode if *}
+{literal}
+  <script>
+
+    //HUMANISTS UK EDIT HUK-30 (can't use extra tpl as ajax popup)
+    jQuery(document).ready(function() {
+      cj('#record_contribution').trigger("click");
+    });
+
+  </script>
+{/literal}

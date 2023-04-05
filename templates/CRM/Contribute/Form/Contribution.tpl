@@ -643,5 +643,59 @@
             j = (j = i.length) > 3 ? j % 3 : 0;
     return s + (j ? i.substr(0, j) + t : "") + i.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + t) + (c ? d + Math.abs(n - i).toFixed(c).slice(2) : "");
   };
+
+  //HUMANISTS UK EDIT - HUK-30
+  jQuery(document).ready(function ($) {
+
+    var contactID = {/literal}{$contactID}{literal}
+
+    CRM.api3('ContributionRecur', 'getcount', {
+      "sequential": 1,
+      "payment_processor_id": 11,
+      "contribution_status_id": {"IN":["In Progress","Pending"]},
+      "contact_id": contactID,
+    }).done(function(result) {
+      var selectedPaymentProcessor = CRM.$('#payment_processor_id').val();
+      var str;
+      if (result.result > 0) {
+        str = "<br /><small style='color:orange;'>FYI: They have a DD in place. If you're setting up a new DD, you likely want to use 'Add to an existing Direct Debit'</small>";
+      } else {
+        str = "<br /><small style='color:grey;'>FYI: They don't have a DD in place.</small>";
+
+      }
+      if (str) {
+        $('#payment_processor_id').after(str);
+      }
+    });
+
+
+    $('body').on('input', '#multiple_block #block_1', function() {
+      var txt = $(this).val();
+      if (txt.length == 2) {
+        $('#multiple_block #block_2').focus();
+      }
+    });
+
+    $('body').on('input', '#multiple_block #block_2', function() {
+      var txt = $(this).val();
+      if (txt.length == 2) {
+        $('#multiple_block #block_3').focus();
+      }
+    });
+
+    //tick monthly/annual checkbox when payment processor id selected
+    $('body').on('change', '#payment_processor_id', function() {
+      var pp = $(this).val();
+      if (pp == 13 || pp == 11) {
+        $('#is_recur').prop('checked',true).trigger('change');
+        $('#installments').val('');
+      } else if (pp == 5) {
+        $('#is_recur').prop('checked',false).trigger('change');
+      }
+    });
+
+
+  });
+
 </script>
 {/literal}
