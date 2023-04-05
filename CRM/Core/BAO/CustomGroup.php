@@ -1044,7 +1044,7 @@ ORDER BY civicrm_custom_group.weight,
         'civicrm_custom_group.'
       );
 
-    $orderBy = " ORDER BY civicrm_custom_group.weight, civicrm_custom_field.weight";
+    $orderBy = " ORDER BY civicrm_custom_group.title, civicrm_custom_field.weight"; //HUK-12
 
     // final query string
     $queryString = $select . $from . $where . $orderBy;
