@@ -40,7 +40,7 @@
           {else}
             <a href="{crmURL p="civicrm/activity/email/add" q="action=add&reset=1&email_id=`$item.id`"}" class="crm-popup" title="{ts 1=$item.email}Send email to %1{/ts}">
             {$item.email}
-            </a>
+            </a><br />{$item.permissionsinfo}<!--HUK-44-->
           {/if}
         {else}
           {$item.email}
