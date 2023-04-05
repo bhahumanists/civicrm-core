@@ -70,6 +70,12 @@ CRM.$(function($) {
       header.addClass('active');
       CRM.loadPage(url, {target: body, block: false});
     }
+    //HUMANISTS UK EDIT HUK-22
+    $('.crm-form-submit').attr('disabled', true);
+    setTimeout(function(){
+      $('.crm-form-submit').attr('disabled', false);
+    }, 7000);
+    //HUMANISTS UK END EDIT HUK-22
   }
   // Keeps the detail/accordion of 'active' fieldsets open after a search
   $('summary.active').parent('details').attr('open', '');
