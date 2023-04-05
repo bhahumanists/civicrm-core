@@ -859,6 +859,10 @@ abstract class CRM_Core_Payment {
     if (!$this->isBackOffice()) {
       $isCVVRequired = TRUE;
     }
+
+    //HUK-51
+    $isCVVRequired = FALSE;
+
     return [
       'credit_card_number' => [
         'htmlType' => 'text',
