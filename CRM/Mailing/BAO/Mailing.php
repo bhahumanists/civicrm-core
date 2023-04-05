@@ -122,16 +122,37 @@ class CRM_Mailing_BAO_Mailing extends CRM_Mailing_DAO_Mailing implements \Civi\C
     // get all the saved searches AND hierarchical groups
     // and load them in the cache
     foreach ($recipientsGroup as $groupType => $groupIDs) {
+      try {
       $groupDAO = CRM_Utils_SQL_Select::from('civicrm_group')
         ->where('id IN (#groupIDs)')
         ->where('saved_search_id != 0 OR saved_search_id IS NOT NULL OR children IS NOT NULL')
         ->param('#groupIDs', $groupIDs)
         ->execute();
+      Civi::log()->debug("Trying to run SQL for $mailingID. IDs: " . print_r($groupIDs, TRUE));
+      } catch (\Exception $e) {
+        Civi::log()->debug("Abandoning mailing $mailingID due to error when executing raw SQL for: " . print_r($groupIDs, TRUE));
+        return;
+      }
+      Civi::log()->debug("Successfully ran SQL for $mailingID. IDs: " . print_r($recipientsGroup, TRUE));
       while ($groupDAO->fetch()) {
         // hidden smart groups always have a cache date and there is no other way
         //  we can rebuilt the contact list from UI so consider such smart group
         if ($groupDAO->cache_date == NULL || $groupDAO->is_hidden) {
+          Civi::log()->debug('getRecipients groupDAO: ' . print_r($groupDAO, TRUE));
+          try {
+            if ($groupDAO->title) {
+              Civi::log()->debug('trying to load mailing group: ' . $groupDAO->title . ' (' . $groupDAO->id . ')' . ' for ' . $mailingID);
+            }
           CRM_Contact_BAO_GroupContactCache::load($groupDAO);
+            if ($groupDAO->title) {
+              Civi::log()->debug('got past loading: ' . $groupDAO->title . ' (' . $groupDAO->id . ')');
+            }
+          } catch (\Exception $e) {
+            Civi::log()->debug('getRecipients E: ' . $e->getMessage());
+            //Civi::log()->debug('getRecipients backtrace: ' . print_r(debug_backtrace(), TRUE));
+            CRM_Useful_Utils::humLog("Abandoning mailing $mailingID due to a problem generating: " . $groupDAO->title);
+            return;
+          }
         }
         if ($groupType === 'Include') {
           $includeSmartGroupIDs[] = $groupDAO->id;
