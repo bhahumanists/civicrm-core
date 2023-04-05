@@ -15,7 +15,15 @@
      {assign var='dialogId' value='profile-dialog'}
   {/if}
   {if ($records and $headers) or ($pageViewType eq 'customDataView')}
-    {include file="CRM/common/jsortable.tpl"}
+    <!--HUMANISTS UK EDIT HUK-16-->
+      {crmAPI var='result' entity='CustomGroup' action='get' return="help_pre" id=$customGroupId}
+      {if $result.count > 0}
+          {foreach from=$result.values item=customgroup}
+            <div class="messages help">{$customgroup.help_pre}</div>
+          {/foreach}
+      {/if}
+    <!--HUMANISTS UK EDIT END HUK-16-->
+      {include file="CRM/common/jsortable.tpl"}
     <div id="custom-{$customGroupId}-table-wrapper" {if $pageViewType eq 'customDataView'}class="crm-entity" data-entity="contact" data-id="{$contactId}"{/if}>
       <div>
         {strip}

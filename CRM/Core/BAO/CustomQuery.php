@@ -211,6 +211,9 @@ class CRM_Core_BAO_CustomQuery {
 
         // Ensure the table is joined in (eg if in where but not select).
         $this->joinCustomTableForField($field);
+        if (method_exists('CRM_Useful_Utils', 'createCustomFieldHelpIcon') && is_bha_staff()) {
+          $field['label'] = $field['label'] . ' ' . CRM_Useful_Utils::createCustomFieldHelpIcon(null, $field['id']);
+        } //HUK-16
         switch ($field['data_type']) {
           case 'String':
           case 'StateProvince':

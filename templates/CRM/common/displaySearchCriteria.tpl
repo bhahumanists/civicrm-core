@@ -39,7 +39,7 @@
             {$item|escape}
             {if !$smarty.foreach.criteria.last}
                 {if !empty($operator)}
-                  <span class="font-italic">...{$operator|escape}...</span>
+                  <span class="font-italic">...{$operator}...</span><!--HUK-16-->
                 {else}
                   <span class="font-italic">...{ts}AND{/ts}...</span>
                 {/if}

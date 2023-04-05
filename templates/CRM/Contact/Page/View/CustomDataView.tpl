@@ -18,7 +18,12 @@
         <div class="collapsible-title">
           {$cd_edit.title}
         </div>
-        {if $cvID eq 0}
+        <!--HUMANISTS UK EDIT HUK-16-->
+        {if $cd_edit.help_pre}
+          <div class="messages help">{$cd_edit.help_pre}</div>
+        {/if}
+        <!--/END HUMANISTS UK EDIT HUK-16-->
+          {if $cvID eq 0}
           {assign var='cvID' value='-1'}
         {/if}
         <div class="crm-summary-block" id="custom-set-block-{$customGroupId}-{$cvID}">

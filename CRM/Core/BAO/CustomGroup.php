@@ -1887,6 +1887,7 @@ ORDER BY civicrm_custom_group.weight,
               'field_data_type' => $properties['data_type'] ?? NULL,
               'field_value' => CRM_Core_BAO_CustomField::displayValue($values['data'], $properties['id'], $entityId),
               'options_per_line' => $properties['options_per_line'] ?? NULL,
+              'help_post' => CRM_Utils_Array::value('help_post', $properties),'id' => CRM_Utils_Array::value('id', $properties), //HUK-16
               'data' => $values['data'],
             ];
             // editable = whether this set contains any non-read-only fields
