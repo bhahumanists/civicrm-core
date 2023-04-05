@@ -66,7 +66,7 @@ class CRM_Mailing_BAO_TrackableURL extends CRM_Mailing_DAO_TrackableURL {
         $hrefExists = TRUE;
       }
 
-      $tracker->url = $url;
+      $tracker->url = trim($url); //HUK-52
       $tracker->mailing_id = $mailing_id;
 
       if (!$tracker->find(TRUE)) {
