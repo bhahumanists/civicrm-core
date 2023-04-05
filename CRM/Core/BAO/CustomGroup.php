@@ -578,6 +578,7 @@ ORDER BY civicrm_custom_group.weight,
 
     if (empty($groupTree)) {
       [$multipleFieldGroups, $groupTree] = self::buildGroupTree($entityType, $toReturn, $subTypes, $queryString, $params, $subType);
+      $groupTree = CRM_Coreoverrides_Functions::humanistsuk45_fix_grouptree_subtype($groupTree, $groupID); //HUK-45
 
       $cache->set($cacheKey, $groupTree);
       $cache->set($multipleFieldGroupCacheKey, $multipleFieldGroups);
