@@ -350,6 +350,7 @@ class CRM_Report_Form_Contribute_Summary extends CRM_Report_Form {
     $this->_tagFilter = TRUE;
     $this->_groupFilter = TRUE;
     $this->_currencyColumn = 'civicrm_contribution_currency';
+    $this->_columns = CRM_Coreoverrides_Functions::humanistsuk46_add_payment_instrument($this->_columns); //HUK-46
     parent::__construct();
   }
 
