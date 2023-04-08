@@ -1,0 +1,39 @@
+name: Upgrade 1 -- Fetch latest data and create upgrade branch
+on:
+  workflow_dispatch:
+    inputs:
+      upgrade-version:
+        description: 'CiviCRM version we are upgrading to, as defined by the branch name. eg 5.60'
+        required: true
+      previous-version:
+        description: 'CiviCRM version we are upgrading from, as defined by the branch name. eg 5.50.1'
+        required: true
+jobs:
+  update-branches:
+    runs-on: ubuntu-latest
+    env:
+      ACCESS_TOKEN: '${{ secrets.ACCESS_TOKEN }}' #fine-grained access token for our working repo - expires each year
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: bhahumanists/civicrm-core
+          token: ${{ env.ACCESS_TOKEN }}
+          path: civicrm-core
+
+      - name: Set up a branch for version ${{ github.event.inputs.upgrade-version }}
+        run: |
+          cd civicrm-core
+          git remote add upstream https://github.com/civicrm/civicrm-core.git
+          git fetch upstream
+          git checkout -b ${{ github.event.inputs.upgrade-version }} upstream/${{ github.event.inputs.upgrade-version }}
+          git push origin
+
+      - name: Test whether our commits are going to cause a conflict
+        run: |
+          git config --global user.email "it@humanists.uk"
+          git config --global user.name "GitHub Actions"
+          cd civicrm-core
+          git fetch
+          git checkout ${{ github.event.inputs.previous-version }}
+          git switch ${{ github.event.inputs.upgrade-version }}
+          git log --oneline --grep='^HUK-' ${{ github.event.inputs.previous-version }} | awk '{print $1}' | xargs -n 1 git cherry-pick

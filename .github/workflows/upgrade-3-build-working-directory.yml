@@ -1,0 +1,148 @@
+name: Upgrade 3 -- Run cividist PR for working repo
+on:
+  workflow_dispatch:
+    inputs:
+      upgrade-version:
+        description: 'CiviCRM version we are upgrading to, as defined by the branch name. eg 5.60'
+        required: true
+jobs:
+  build-civi:
+    runs-on: ubuntu-latest
+    env:
+      ACCESS_TOKEN: '${{ secrets.ACCESS_TOKEN }}' #fine-grained access token for our working repo - expires each year
+    steps:
+      - name: Checkout civicrm-packages
+        uses: actions/checkout@v3
+        with:
+          repository: bhahumanists/civicrm-packages
+          token: ${{ env.ACCESS_TOKEN }}
+          path: civicrm-packages
+
+      - name: Checkout civicrm-wordpress
+        uses: actions/checkout@v3
+        with:
+          repository: bhahumanists/civicrm-wordpress
+          token: ${{ env.ACCESS_TOKEN }}
+          path: civicrm-wordpress
+
+      - name: Checkout civicrm-drupal
+        uses: actions/checkout@v3
+        with:
+          repository: bhahumanists/civicrm-drupal
+          token: ${{ env.ACCESS_TOKEN }}
+          path: civicrm-drupal
+
+      - name: Checkout civicrm-drupal-8
+        uses: actions/checkout@v3
+        with:
+          repository: bhahumanists/civicrm-drupal-8
+          token: ${{ env.ACCESS_TOKEN }}
+          path: civicrm-drupal-8
+
+      - name: Checkout civicrm-joomla
+        uses: actions/checkout@v3
+        with:
+          repository: bhahumanists/civicrm-joomla
+          token: ${{ env.ACCESS_TOKEN }}
+          path: civicrm-joomla
+
+      - name: Checkout civicrm-backdrop
+        uses: actions/checkout@v3
+        with:
+          repository: bhahumanists/civicrm-backdrop
+          token: ${{ env.ACCESS_TOKEN }}
+          path: civicrm-backdrop
+
+      - name: Fetch upstream for them all and push to origin
+        run: |
+          cd civicrm-packages
+          git remote add upstream https://github.com/civicrm/civicrm-packages.git
+          git fetch upstream
+          git push origin
+          cd ../civicrm-wordpress
+          git remote add upstream https://github.com/civicrm/civicrm-wordpress.git
+          git fetch upstream
+          git push origin
+          cd ../civicrm-drupal
+          git remote add upstream https://github.com/civicrm/civicrm-drupal.git
+          git fetch upstream
+          git push origin
+          cd ../civicrm-drupal-8
+          git remote add upstream https://github.com/civicrm/civicrm-drupal-8.git
+          git fetch upstream
+          git push origin
+          cd ../civicrm-joomla
+          git remote add upstream https://github.com/civicrm/civicrm-joomla.git
+          git fetch upstream
+          git push origin
+          cd ../civicrm-backdrop
+          git remote add upstream https://github.com/civicrm/civicrm-backdrop.git
+          git fetch upstream
+          git push origin
+
+      - name: Clone our buildkit repo
+        run: git clone https://github.com/bhahumanists/civicrm-buildkit-docker
+
+      - name: Start our buildkit container
+        run:  cd civicrm-buildkit-docker && docker compose up -d
+
+      - name: Create an initial dist
+        run: cd civicrm-buildkit-docker && docker compose exec -u buildkit civicrm civibuild create dist
+
+      - name: Add our custom repos #things could go wrong here if more are added
+        run: |
+          cd civicrm-buildkit-docker
+          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src && git remote add humanistsuk https://github.com/bhahumanists/civicrm-core"
+          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/packages && git remote add humanistsuk https://github.com/bhahumanists/civicrm-packages"
+          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/WordPress && git remote add humanistsuk https://github.com/bhahumanists/civicrm-wordpress"
+          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/drupal && git remote add humanistsuk https://github.com/bhahumanists/civicrm-drupal"
+          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/drupal-8 && git remote add humanistsuk https://github.com/bhahumanists/civicrm-drupal-8"
+          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/joomla && git remote add humanistsuk https://github.com/bhahumanists/civicrm-joomla"
+          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/backdrop && git remote add humanistsuk https://github.com/bhahumanists/civicrm-backdrop"
+
+      - name: Pull our custom repos
+        run: cd civicrm-buildkit-docker && docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist && env GIT_REMOTE=humanistsuk cividist update"
+
+      - name: Build our zip files
+        run: |
+          cd civicrm-buildkit-docker
+          OUTPUT=$(docker compose exec -u buildkit civicrm bash -c "cd /buildkit/build/dist && env FILE_SUFFIX=humanistsuk_customisations cividist build humanistsuk/${{ github.event.inputs.upgrade-version }}")
+
+          #exit if the build failed
+          if [[ "$OUTPUT" =~ "Checkout failed"$ ]]; then
+          echo "Error: Checkout failed"
+          exit 1
+          fi
+
+      - uses: actions/checkout@v3
+        with:
+          repository: bhahumanists/civicrm-working
+          token: ${{ env.ACCESS_TOKEN }}
+          path: civicrm-working
+
+      - name: Clear out the old files
+        run: |
+          cd civicrm-working
+          rm -rf $(find . -maxdepth 1 -mindepth 1 -not -name '.git') #remove everything except .git
+
+      - name: Unzip our built wordpress zip into our working repo
+        run: |
+          cd civicrm-working
+          find $GITHUB_WORKSPACE -type f -name 'civicrm-*-wordpress-humanistsuk_customisations.zip' -print0 | xargs -0 unzip -d .
+          mv civicrm civicrm-top
+          mv civicrm-top/* .
+          rm -rf civicrm-top
+
+      - name: Set current date as env variable
+        run: echo "NOW=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+
+      - name: Create Pull Request
+        env:
+          BRANCH_NAME: ${{ github.event.inputs.upgrade-version }}__${{ env.NOW }}
+        uses: peter-evans/create-pull-request@v5
+        with:
+          path: civicrm-working
+          token: ${{ env.ACCESS_TOKEN }}
+          branch: '${{ env.BRANCH_NAME }}'
+          title: "Update to ${{ github.event.inputs.upgrade-version }} at ${{ env.NOW }}"
+          commit-message: "Update to ${{ github.event.inputs.upgrade-version }}"

@@ -1,0 +1,34 @@
+name: Upgrade 2 -- Build customised core branch
+on:
+  workflow_dispatch:
+    inputs:
+      upgrade-version:
+        description: 'CiviCRM version we are upgrading to, as defined by the branch name. eg 5.60'
+        required: true
+      previous-version:
+        description: 'CiviCRM version we are upgrading from, as defined by the branch name. eg 5.50.1'
+        required: true
+jobs:
+  merge-customisations:
+    runs-on: ubuntu-latest
+    env:
+      ACCESS_TOKEN: '${{ secrets.ACCESS_TOKEN }}' #fine-grained access token for our working repo - expires each year
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: bhahumanists/civicrm-core
+          token: ${{ env.ACCESS_TOKEN }}
+          path: civicrm-core
+
+      - name: Cherry-pick all commits beginning with 'HUK' into our new branch
+        run: |
+          git config --global user.email "it@humanists.uk"
+          git config --global user.name "GitHub Actions"
+          cd civicrm-core
+          git fetch
+          git checkout ${{ github.event.inputs.previous-version }}
+          git switch ${{ github.event.inputs.upgrade-version }}
+          git log --oneline --grep='^HUK-' ${{ github.event.inputs.previous-version }} | awk '{print $1}' | xargs -n 1 git cherry-pick
+          git push -u origin ${{ github.event.inputs.upgrade-version }}
+
+
