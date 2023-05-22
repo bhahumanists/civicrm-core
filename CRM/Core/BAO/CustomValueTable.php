@@ -626,6 +626,11 @@ AND    cf.id IN ( $fieldIDList )
         if (is_array($fieldValue['value']) && CRM_Core_BAO_CustomField::isSerialized($dao)) {
           $fieldValue['value'] = CRM_Utils_Array::implodePadded($fieldValue['value']);
         }
+        //HUK-55 - View-only date fields cannot be merged
+        if ($dataType == 'Timestamp' && !is_numeric($fieldValue['value'])) {
+          $fieldValue['value'] = strtotime($fieldValue['value']);
+        }
+        //END HUK-55
         // Format null values correctly
         if ($fieldValue['value'] === NULL || $fieldValue['value'] === '') {
           switch ($dataType) {
