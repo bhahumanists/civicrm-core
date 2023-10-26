@@ -256,7 +256,7 @@ class CRM_Core_DAO_Navigation extends CRM_Core_DAO {
           'type' => CRM_Utils_Type::T_STRING,
           'title' => ts('Url'),
           'description' => ts('url in case of custom navigation link'),
-          'maxlength' => 255,
+          //'maxlength' => 255, //HUK-58
           'size' => CRM_Utils_Type::HUGE,
           'where' => 'civicrm_navigation.url',
           'table_name' => 'civicrm_navigation',
