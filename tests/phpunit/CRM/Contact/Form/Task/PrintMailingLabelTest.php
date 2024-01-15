@@ -59,7 +59,7 @@ class CRM_Contact_Form_Task_PrintMailingLabelTest extends CiviUnitTestCase {
       }
     }
 
-    /* @var CRM_Contact_Form_Task_Label $fom */
+    /** @var CRM_Contact_Form_Task_Label $form */
     $form = $this->getFormObject('CRM_Contact_Form_Task_Label', [
       'label_name' => 3475,
       'location_type_id' => NULL,
@@ -73,7 +73,14 @@ class CRM_Contact_Form_Task_PrintMailingLabelTest extends CiviUnitTestCase {
     catch (CRM_Core_Exception_PrematureExitException $e) {
       $rows = $e->errorData['contactRows'];
     }
-
+    $this->assertEquals('Mr. Antonia J. D`souza II
+Main Street 23
+Brummen, 6971 BN
+NETHERLANDS', $rows[$contactIDs[0]][0]);
+    $this->assertEquals('Mr. Anthony J. Collins II
+Main Street 23
+Brummen, 6971 BN
+NETHERLANDS', $rows[$contactIDs[1]][0]);
     foreach ($contactIDs as $contactID) {
       // ensure that the address printed in the mailing labe is always primary if 'location_type_id' - none (as Primary) is chosen
       $this->assertStringContainsString($addresses[$contactID]['primary']['street_address'], $rows[$contactID][0]);

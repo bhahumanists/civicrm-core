@@ -94,7 +94,7 @@ class CRM_Admin_Form_PaymentProcessor extends CRM_Admin_Form {
    */
   public function preProcess() {
     parent::preProcess();
-    CRM_Core_Session::singleton()->pushUserContext('civicrm/admin/paymentProcessor?reset=1');
+    CRM_Core_Session::singleton()->pushUserContext(CRM_Utils_System::url('civicrm/admin/paymentProcessor', ['reset' => 1], FALSE, NULL, FALSE));
 
     $this->setPaymentProcessorTypeID();
     $this->setPaymentProcessor();
@@ -246,10 +246,6 @@ class CRM_Admin_Form_PaymentProcessor extends CRM_Admin_Form {
     )
     ) {
       $errors['_qf_default'] = ts('You must have at least the test or live section filled');
-    }
-
-    if (!empty($errors)) {
-      return $errors;
     }
 
     return empty($errors) ? TRUE : $errors;
@@ -429,7 +425,6 @@ class CRM_Admin_Form_PaymentProcessor extends CRM_Admin_Form {
           $creditCards[$type] = $creditCardTypes[$type];
         }
       }
-      $creditCards = json_encode($creditCards);
     }
 
     $params = array_merge([
@@ -469,10 +464,10 @@ class CRM_Admin_Form_PaymentProcessor extends CRM_Admin_Form {
       $this->set('pp', $this->_paymentProcessorType);
     }
     else {
-      $paymentProcessorTypes = CRM_Core_PseudoConstant::get('CRM_Financial_DAO_PaymentProcessor', 'payment_processor_type_id', array(
+      $paymentProcessorTypes = CRM_Core_PseudoConstant::get('CRM_Financial_DAO_PaymentProcessor', 'payment_processor_type_id', [
         'labelColumn' => 'name',
         'flip' => 1,
-      ));
+      ]);
       $this->_paymentProcessorType = CRM_Utils_Request::retrieve('pp', 'String', $this, FALSE, $paymentProcessorTypes['PayPal']);
     }
   }

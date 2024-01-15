@@ -11,6 +11,7 @@ use Civi\WorkflowMessage\WorkflowMessage;
 /**
  * Class CRM_Core_BAO_MessageTemplateTest
  * @group headless
+ * @group msgtpl
  */
 class CRM_Core_BAO_MessageTemplateTest extends CiviUnitTestCase {
 
@@ -69,6 +70,10 @@ class CRM_Core_BAO_MessageTemplateTest extends CiviUnitTestCase {
     $allTemplates['fr_CA'] = ['subject' => 'Bonjour Canada', 'html' => 'Voila! Canada', 'text' => '{contribution.total_amount}'];
     $allTemplates['es_PR'] = ['subject' => 'Buenos dias', 'html' => 'Listo', 'text' => '{contribution.total_amount}'];
     $allTemplates['th_TH'] = ['subject' => 'สวัสดี', 'html' => 'ดังนั้น', 'text' => '{contribution.total_amount}'];
+    // en_US is the default language. We add it to ensure the translation is loaded rather than falling back to
+    // the message template. While it might seem you don't need a translation for the site default language
+    // all the draft & approval logic is attached to the translation, not the template.
+    $allTemplates['en_US'] = ['subject' => 'site default', 'html' => 'site default language', 'text' => '{contribution.total_amount}'];
 
     $rendered = [];
     // $rendered['*'] = ['subject' => 'Hello', 'html' => 'Look there!', 'text' => '$ 100.00'];
@@ -77,6 +82,7 @@ class CRM_Core_BAO_MessageTemplateTest extends CiviUnitTestCase {
     $rendered['fr_CA'] = ['subject' => 'Bonjour Canada', 'html' => 'Voila! Canada', 'text' => '100,00 $ US'];
     $rendered['es_PR'] = ['subject' => 'Buenos dias', 'html' => 'Listo', 'text' => '100.00 $US'];
     $rendered['th_TH'] = ['subject' => 'สวัสดี', 'html' => 'ดังนั้น', 'text' => 'US$100.00'];
+    $rendered['en_US'] = ['subject' => 'site default', 'html' => 'site default language', 'text' => '$100.00'];
 
     $result = [/* settings, templates, preferredLanguage, expectMessage */];
 
@@ -91,10 +97,18 @@ class CRM_Core_BAO_MessageTemplateTest extends CiviUnitTestCase {
     $result['fr_CA falls back to fr_FR (ltd-tpls; no-partials)'] = [$noPartials, $this->getLocaleTemplates($allTemplates, ['*', 'fr_FR']), 'fr_CA', $rendered['fr_FR']];
 
     $result['th_TH matches th_TH (all-tpls; yes-partials)'] = [$yesPartials, $allTemplates, 'th_TH', $rendered['th_TH']];
-    $result['th_TH falls back to system default (all-tpls; no-partials)'] = [$noPartials, $allTemplates, 'th_TH', $rendered['*']];
+    $result['th_TH falls back to site default translation (all-tpls; no-partials)'] = [$noPartials, $allTemplates, 'th_TH', $rendered['en_US']];
+    // Absent a translation for the site default language it should fall back to the message template.
+    $result['th_TH falls back to system default (all-tpls; no-partials)'] = [$noPartials, array_diff_key($allTemplates, ['en_US' => TRUE]), 'th_TH', $rendered['*']];
     // ^^ The essence of the `partial_locales` setting -- whether partially-supported locales (th_TH) use mixed-mode or fallback to completely diff locale.
     $result['th_TH falls back to system default (ltd-tpls; yes-partials)'] = [$yesPartials, $this->getLocaleTemplates($allTemplates, ['*']), 'th_TH', $rendered['*']];
     $result['th_TH falls back to system default (ltd-tpls; no-partials)'] = [$noPartials, $this->getLocaleTemplates($allTemplates, ['*']), 'th_TH', $rendered['*']];
+
+    // Check that the en_US template is loaded, if exists.
+    $result['en_US matches en_US (all-tpls; yes-partials)'] = [$yesPartials, $allTemplates, 'en_US', $rendered['en_US']];
+    // We have no translation for Danish but there IS an en_US one & en_US is the site-default language. We should
+    // fall back to it rather than the message template. Ref https://github.com/civicrm/civicrm-core/pull/26232
+    $result['da_DK matches en_US (all-tpls; yes-partials)'] = [$yesPartials, $allTemplates, 'da_DK', $rendered['en_US']];
 
     return $result;
   }
@@ -186,7 +200,84 @@ class CRM_Core_BAO_MessageTemplateTest extends CiviUnitTestCase {
       CRM_Utils_Array::subset($rendered, ['subject', 'html', 'text'])
     );
     // Explicitly unset & initiate __destruct so it is clear there is a reason to set it.
-    unset($cleanup);
+    $cleanup->cleanup();
+  }
+
+  /**
+   * Test that a suitable translated message is retrieved when there
+   * is an incomplete translation set.
+   *
+   * This covers a scenario where there is a translated template
+   * for both Spanish and Mexican for one template but for
+   * the other there is only Spanish. It should fall back
+   * to Spanish for the second but, as of writing, it is
+   * not doing so IF another template has a Mexican option.
+   *
+   * @throws \CRM_Core_Exception
+   * @throws \Civi\API\Exception\UnauthorizedException
+   */
+  public function testGetTemplateTranslationIncompleteTemplateSet(): void {
+    $messageTemplates = (array) MessageTemplate::get()
+      ->addWhere('is_default', '=', 1)
+      ->addWhere('workflow_name', 'LIKE', 'contribution_%')
+      ->addSelect('id', 'workflow_name')
+      ->setLimit(3)
+      ->execute()->indexBy('workflow_name');
+    [$firstTemplate, $secondTemplate, $thirdTemplate] = array_keys($messageTemplates);
+    foreach ($messageTemplates as $workflowName => $messageTemplate) {
+      // The translation for the site default language is only used when neither of the other 2 exist.
+      $records = [
+        ['entity_field' => 'msg_subject', 'string' => 'subject - site default translation', 'language' => 'en_US'],
+        ['entity_field' => 'msg_html', 'string' => 'html - site default translation', 'language' => 'en_US'],
+      ];
+      if ($workflowName !== $thirdTemplate) {
+        // All except one template gets a Spanish translation. This should be used where there is no Mexican translation.
+        $records[] = ['entity_field' => 'msg_subject', 'string' => 'subject - Spanish', 'language' => 'es_ES'];
+        $records[] = ['entity_field' => 'msg_html', 'string' => 'html -Spanish', 'language' => 'es_ES'];
+      }
+      if ($secondTemplate === $workflowName) {
+        // One gets a Mexican translation. This should be used.
+        $records[] = ['entity_field' => 'msg_subject', 'string' => 'subject - Mexican', 'language' => 'es_MX'];
+        $records[] = ['entity_field' => 'msg_html', 'string' => 'html - Mexican', 'language' => 'es_MX'];
+      }
+
+      Translation::save()->setRecords($records)->setDefaults([
+        'entity_table' => 'civicrm_msg_template',
+        'entity_id' => $messageTemplate['id'],
+        'status_id:name' => 'active',
+      ])->execute();
+    }
+    $translatedTemplate = MessageTemplate::get()
+      ->addWhere('is_default', '=', 1)
+      ->addWhere('workflow_name', '=', $secondTemplate)
+      ->addSelect('id', 'msg_subject', 'msg_html', 'msg_text')
+      ->setLanguage('es_MX')
+      ->setTranslationMode('fuzzy')
+      ->execute()->first();
+    $this->assertEquals('subject - Mexican', $translatedTemplate['msg_subject']);
+    $this->assertEquals('html - Mexican', $translatedTemplate['msg_html']);
+
+    // This should fall back to Spanish...
+    $translatedTemplate = MessageTemplate::get()
+      ->addWhere('is_default', '=', 1)
+      ->addWhere('workflow_name', '=', $firstTemplate)
+      ->addSelect('id', 'msg_subject', 'msg_html', 'msg_text')
+      ->setLanguage('es_MX')
+      ->setTranslationMode('fuzzy')
+      ->execute()->first();
+    $this->assertEquals('subject - Spanish', $translatedTemplate['msg_subject']);
+    $this->assertEquals('html -Spanish', $translatedTemplate['msg_html']);
+
+    // This should fall back to en_US translation...
+    $translatedTemplate = MessageTemplate::get()
+      ->addWhere('is_default', '=', 1)
+      ->addWhere('workflow_name', '=', $thirdTemplate)
+      ->addSelect('id', 'msg_subject', 'msg_html', 'msg_text')
+      ->setLanguage('es_MX')
+      ->setTranslationMode('fuzzy')
+      ->execute()->first();
+    $this->assertEquals('subject - site default translation', $translatedTemplate['msg_subject']);
+    $this->assertEquals('html - site default translation', $translatedTemplate['msg_html']);
   }
 
   /**
@@ -305,10 +396,13 @@ class CRM_Core_BAO_MessageTemplateTest extends CiviUnitTestCase {
   public function testCaseActivityCopyTemplate():void {
     $client_id = $this->individualCreate();
     $contact_id = $this->individualCreate();
-
-    $msg = WorkflowMessage::create('case_activity', [
+    \CRM_Core_DAO::executeQuery("
+      INSERT INTO civicrm_msg_template (msg_text, msg_subject, workflow_name, is_active, is_default)
+      VALUES('" . $this->getActivityCaseText() . "', '" . $this->getActivityCaseSubject() . "', 'case_activity_test', 1, 1)
+    ");
+    $msg = WorkflowMessage::create('case_activity_test', [
       'modelProps' => [
-        'contactId' => $contact_id,
+        'contactID' => $contact_id,
         'contact' => ['role' => 'Sand grain counter'],
         'isCaseActivity' => 1,
         'clientId' => $client_id,
@@ -329,7 +423,7 @@ class CRM_Core_BAO_MessageTemplateTest extends CiviUnitTestCase {
     $this->assertEquals([], Invasive::get([$msg, '_extras']));
 
     [, $subject, $message] = $msg->sendTemplate([
-      'workflow' => 'case_activity',
+      'workflow' => 'case_activity_test',
       'from' => 'admin@example.com',
       'toName' => 'Demo',
       'toEmail' => 'admin@example.com',
@@ -339,6 +433,108 @@ class CRM_Core_BAO_MessageTemplateTest extends CiviUnitTestCase {
     $this->assertEquals('[case #' . $msg->getIdHash() . '] Test 123', $subject);
     $this->assertStringContainsString('Your Case Role(s) : Sand grain counter', $message);
     $this->assertStringContainsString('Case ID : 1234', $message);
+  }
+
+  public function testSendToEmail_variantA(): void {
+    $mut = new CiviMailUtils($this, TRUE);
+    $this->individualCreate();
+
+    $msg = WorkflowMessage::create('petition_sign', [
+      'from' => '"The Sender" <sender-a@example.com>',
+      'toEmail' => 'demo-a@example.com',
+      'contactId' => 204,
+    ]);
+    $msg->sendTemplate([
+      'messageTemplate' => [
+        'msg_subject' => 'Hello world',
+        'msg_text' => 'Hello',
+        'msg_html' => '<p>Hello</p>',
+      ],
+    ]);
+    $mut->checkMailLog([
+      'From: "The Sender" <sender-a@example.com>',
+      'To: <demo-a@example.com>',
+      "Subject: Hello world",
+    ]);
+    $mut->stop();
+  }
+
+  /**
+   * Get the contents of the case activity text template, from when the test was written.
+   * @return string
+   */
+  public function getActivityCaseSubject(): string {
+    return '{if !empty($idHash)}[case #{$idHash}]{/if} {$activitySubject}';
+  }
+
+  /**
+   * Get the contents of the case activity text template, from when the test was written.
+   * @return string
+   */
+  public function getActivityCaseText(): string {
+    return '===========================================================
+{ts}Activity Summary{/ts} - {$activityTypeName}
+===========================================================
+{if !empty($isCaseActivity)}
+{ts}Your Case Role(s){/ts} : {$contact.role|default:""}
+{if !empty($manageCaseURL)}
+{ts}Manage Case{/ts} : {$manageCaseURL}
+{/if}
+{/if}
+
+{if !empty($editActURL)}
+{ts}Edit activity{/ts} : {$editActURL}
+{/if}
+{if !empty($viewActURL)}
+{ts}View activity{/ts} : {$viewActURL}
+{/if}
+
+{foreach from=$activity.fields item=field}
+{if $field.type eq "Date"}
+{$field.label} : {$field.value|crmDate:$config->dateformatDatetime}
+{else}
+{$field.label} : {$field.value}
+{/if}
+{/foreach}
+
+{if !empty($activity.customGroups)}
+{foreach from=$activity.customGroups key=customGroupName item=customGroup}
+==========================================================
+{$customGroupName}
+==========================================================
+{foreach from=$customGroup item=field}
+{if $field.type eq "Date"}
+{$field.label} : {$field.value|crmDate:$config->dateformatDatetime}
+{else}
+{$field.label} : {$field.value}
+{/if}
+{/foreach}
+
+{/foreach}
+{/if}
+';
+  }
+
+  public function testSendToEmail_variantB(): void {
+    $mut = new CiviMailUtils($this, TRUE);
+    $cid = $this->individualCreate();
+
+    WorkflowMessage::create('petition_sign')
+      ->setFrom(['name' => 'The Sender', 'email' => 'sender-b@example.com'])
+      ->setTo(['name' => 'The Recipient', 'email' => 'demo-b@example.com'])
+      ->setContactID($cid)
+      ->setTemplate([
+        'msg_subject' => 'Bonjour le monde',
+        'msg_text' => 'Ça va',
+        'msg_html' => '<p>Ça va</p>',
+      ])
+      ->sendTemplate();
+    $mut->checkMailLog([
+      'From: The Sender <sender-b@example.com>',
+      'To: The Recipient <demo-b@example.com>',
+      "Subject: Bonjour le monde",
+    ]);
+    $mut->stop();
   }
 
   /**
@@ -425,7 +621,7 @@ London, 90210
    */
   public function testContactTokens(): void {
     // Freeze the time at the start of the test, so checksums don't suffer from second rollovers.
-    $restoreTime = $this->useFrozenTime();
+    $this->useFrozenTime();
 
     $this->hookClass->setHook('civicrm_tokenValues', [$this, 'hookTokenValues']);
     $this->hookClass->setHook('civicrm_tokens', [$this, 'hookTokens']);
@@ -434,6 +630,12 @@ London, 90210
     $tokenData = $this->getOldContactTokens();
     $address = $this->setupContactFromTokeData($tokenData);
     $advertisedTokens = CRM_Core_SelectValues::contactTokens();
+
+    // let's unset specical afform submission tokens which are kind of related to contact
+    // but not exactly as contact is not yet created
+    unset($advertisedTokens['{afformSubmission.validateSubmissionUrl}']);
+    unset($advertisedTokens['{afformSubmission.validateSubmissionLink}']);
+
     $this->assertEquals($this->getAdvertisedTokens(), $advertisedTokens);
 
     CRM_Core_Smarty::singleton()->assign('pre_assigned_smarty', 'woo');
@@ -493,10 +695,7 @@ emo
    */
   public function testTokensIndividually(): void {
     // Freeze the time at the start of the test, so checksums don't suffer from second rollovers.
-    // This variable releases the time on destruct so needs to be assigned for the
-    // duration of the test.
-    /** @noinspection PhpUnusedLocalVariableInspection */
-    $restoreTime = $this->useFrozenTime();
+    $this->useFrozenTime();
 
     $this->hookClass->setHook('civicrm_tokenValues', [$this, 'hookTokenValues']);
     $this->hookClass->setHook('civicrm_tokens', [$this, 'hookTokens']);
@@ -538,6 +737,7 @@ emo
       'contact.contact_is_deleted:',
       'contact.county:',
       'contact.custom_6:',
+      'contact.deceased_date:',
       'contact.do_not_phone:',
     ], array_values($emptyLines), 'Most tokens should have data.');
   }
@@ -703,6 +903,7 @@ emo
       '{contact.job_title}' => 'Job Title',
       '{contact.gender_id:label}' => 'Gender',
       '{contact.birth_date}' => 'Birth Date',
+      '{contact.deceased_date}' => 'Deceased Date',
       '{contact.employer_id}' => 'Current Employer ID',
       '{contact.is_deleted:label}' => 'Contact is in Trash',
       '{contact.created_date}' => 'Created Date',
@@ -785,7 +986,7 @@ emo
       'do_not_trade' => 1,
       'is_opt_out' => 1,
       'external_identifier' => 'blah',
-      'sort_name' => 'Smith, Robert',
+      'sort_name' => 'Smith, Robert II',
       'display_name' => 'Robert Smith',
       'nick_name' => 'Bob',
       'image_URL' => 'https://example.com',
@@ -889,8 +1090,6 @@ emo
    * advertise them and the old 'random' v3 style tokens continued to work.
    *
    * But, we should support them for a bit - which means testing them...
-   *
-   * @throws \CRM_Core_Exception
    */
   public function testBrieflyPopularTokens(): void {
     $this->createCustomGroupWithFieldsOfAllTypes([]);
@@ -916,21 +1115,6 @@ primary_website:https://civicrm.org
 primary_openid:OpenID
 primary_phone:123-456
 ', $messageHtml);
-  }
-
-  /**
-   * Temporarily freeze time, as perceived through `CRM_Utils_Time`.
-   *
-   * @return \CRM_Utils_AutoClean
-   */
-  protected function useFrozenTime(): CRM_Utils_AutoClean {
-    $oldTimeFunc = getenv('TIME_FUNC');
-    putenv('TIME_FUNC=frozen');
-    CRM_Utils_Time::setTime(date('Y-m-d H:i:s'));
-    return CRM_Utils_AutoClean::with(function () use ($oldTimeFunc) {
-      putenv($oldTimeFunc === NULL ? 'TIME_FUNC' : "TIME_FUNC=$oldTimeFunc");
-      CRM_Utils_Time::resetTime();
-    });
   }
 
   /**
@@ -979,7 +1163,7 @@ do_not_sms:1
 do_not_trade:1
 is_opt_out:1
 external_identifier:blah
-sort_name:Smith, Robert
+sort_name:Smith, Robert II
 display_name:Mr. Robert Smith II
 nick_name:Bob
 image_URL:https://example.com
@@ -1078,7 +1262,7 @@ do_not_sms:label |Yes
 do_not_trade:label |Yes
 is_opt_out:label |Yes
 external_identifier |blah
-sort_name |Smith, Robert
+sort_name |Smith, Robert II
 display_name |Mr. Robert Smith II
 nick_name |Bob
 image_URL |https://example.com
@@ -1096,6 +1280,7 @@ communication_style_id:label |Formal
 job_title |Busy person
 gender_id:label |Female
 birth_date |December 31st, 1998
+deceased_date |
 employer_id |' . $contact['employer_id'] . '
 is_deleted:label |No
 created_date |January 1st, 2020

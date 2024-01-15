@@ -61,8 +61,8 @@ class PartialSyntaxTest extends \CiviUnitTestCase {
       '<div foo="ts(\'Hello world\')\"></div>',
     ];
     $cases[5] = [
-      '<a href="{{foo}}" title="{{bar}}"></a>',
-      '<a href="{{foo}}" title="{{bar}}"></a>',
+      '<a ng-href="{{foo}}" title="{{bar}}"></a>',
+      '<a ng-href="{{foo}}" title="{{bar}}"></a>',
     ];
     $cases[6] = [
       '<div ng-if="a && b"></div>',
@@ -88,7 +88,7 @@ class PartialSyntaxTest extends \CiviUnitTestCase {
 
   /**
    */
-  public function testAllPartials() {
+  public function testAllPartials(): void {
     $this->markTestIncomplete('checkConsistentHtml gives too many false-positive errors to be useful in a unit test.');
 
     $coder = new \Civi\Angular\Coder();

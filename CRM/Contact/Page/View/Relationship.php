@@ -140,19 +140,6 @@ class CRM_Contact_Page_View_Relationship extends CRM_Core_Page {
   }
 
   /**
-   * called when action is browse.
-   *
-   */
-  public function browse() {
-    // do nothing :) we are using datatable for rendering relationship selectors
-    $columnHeaders = CRM_Contact_BAO_Relationship::getColumnHeaders();
-    $selector = NULL;
-    $contactRelationships = [];
-    CRM_Utils_Hook::searchColumns('relationship.columns', $columnHeaders, $contactRelationships, $selector);
-    $this->assign('columnHeaders', $columnHeaders);
-  }
-
-  /**
    * called when action is update or new.
    *
    */
@@ -215,11 +202,6 @@ class CRM_Contact_Page_View_Relationship extends CRM_Core_Page {
       $this->edit();
     }
 
-    // if this is called from case view, suppress browse relationships form
-    else {
-      $this->browse();
-    }
-
     return parent::run();
   }
 
@@ -245,7 +227,9 @@ class CRM_Contact_Page_View_Relationship extends CRM_Core_Page {
   }
 
   /**
-   * Get action links.
+   * @deprecated since 5.68. Will be removed around 5.74.
+   *
+   * Only-used-by-user-dashboard.
    *
    * @return array
    *   (reference) of action links
@@ -258,28 +242,33 @@ class CRM_Contact_Page_View_Relationship extends CRM_Core_Page {
           'url' => 'civicrm/contact/view/rel',
           'qs' => 'action=view&reset=1&cid=%%cid%%&id=%%id%%&rtype=%%rtype%%&selectedChild=rel',
           'title' => ts('View Relationship'),
+          'weight' => -20,
         ],
         CRM_Core_Action::UPDATE => [
           'name' => ts('Edit'),
           'url' => 'civicrm/contact/view/rel',
           'qs' => 'action=update&reset=1&cid=%%cid%%&id=%%id%%&rtype=%%rtype%%',
           'title' => ts('Edit Relationship'),
+          'weight' => -10,
         ],
         CRM_Core_Action::ENABLE => [
           'name' => ts('Enable'),
           'ref' => 'crm-enable-disable',
           'title' => ts('Enable Relationship'),
+          'weight' => 30,
         ],
         CRM_Core_Action::DISABLE => [
           'name' => ts('Disable'),
           'ref' => 'crm-enable-disable',
           'title' => ts('Disable Relationship'),
+          'weight' => 40,
         ],
         CRM_Core_Action::DELETE => [
           'name' => ts('Delete'),
           'url' => 'civicrm/contact/view/rel',
           'qs' => 'action=delete&reset=1&cid=%%cid%%&id=%%id%%&rtype=%%rtype%%',
           'title' => ts('Delete Relationship'),
+          'weight' => 100,
         ],
         // FIXME: Not sure what to put as the key.
         // We want to use it differently later anyway (see CRM_Contact_BAO_Relationship::getRelationship). NONE should make it hidden by default.

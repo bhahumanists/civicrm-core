@@ -91,6 +91,11 @@ abstract class CRM_Import_Parser implements UserJobInterface {
   protected $statesByCountry = [];
 
   /**
+   * @var int|null
+   */
+  protected $siteDefaultCountry = NULL;
+
+  /**
    * @return int|null
    */
   public function getUserJobID(): ?int {
@@ -203,7 +208,7 @@ abstract class CRM_Import_Parser implements UserJobInterface {
    * @return string
    */
   protected function getContactType(): string {
-    return $this->getSubmittedValue('contactType') ?: $this->getContactTypeForEntity('Contact');
+    return $this->getSubmittedValue('contactType') ?: $this->getContactTypeForEntity('Contact') ?? '';
   }
 
   /**
@@ -672,7 +677,7 @@ abstract class CRM_Import_Parser implements UserJobInterface {
     $queue = Civi::queue('user_job_' . $this->getUserJobID(), ['type' => 'Sql', 'error' => 'abort', 'runner' => 'task', 'user_job_id' => $this->getUserJobID(), 'retry_limit' => 5]);
     UserJob::update(FALSE)->setValues(['queue_id.name' => 'user_job_' . $this->getUserJobID()])->addWhere('id', '=', $this->getUserJobID())->execute();
     $offset = 0;
-    $batchSize = 50;
+    $batchSize = Civi::settings()->get('import_batch_size');
     while ($totalRows > 0) {
       if ($totalRows < $batchSize) {
         $batchSize = $totalRows;
@@ -843,7 +848,7 @@ abstract class CRM_Import_Parser implements UserJobInterface {
    */
   protected function checkContactDuplicate(&$formatValues) {
     //retrieve contact id using contact dedupe rule
-    $formatValues['contact_type'] = $formatValues['contact_type'] ?? $this->getContactType();
+    $formatValues['contact_type'] ??= $this->getContactType();
     $formatValues['version'] = 3;
     $params = $formatValues;
     static $cIndieFields = NULL;
@@ -1123,11 +1128,6 @@ abstract class CRM_Import_Parser implements UserJobInterface {
 
     // get the formatted location blocks into params - w/ 3.0 format, CRM-4605
     if (!empty($values['location_type_id'])) {
-      static $fields = NULL;
-      if ($fields == NULL) {
-        $fields = [];
-      }
-
       foreach (['Phone', 'Email', 'IM', 'OpenID', 'Phone_Ext'] as $block) {
         $name = strtolower($block);
         if (!array_key_exists($name, $values)) {
@@ -1174,7 +1174,7 @@ abstract class CRM_Import_Parser implements UserJobInterface {
 
       $addressCnt = 1;
       foreach ($params['address'] as $cnt => $addressBlock) {
-        if (CRM_Utils_Array::value('location_type_id', $values) ==
+        if (($values['location_type_id'] ?? NULL) ==
           CRM_Utils_Array::value('location_type_id', $addressBlock)
         ) {
           $addressCnt = $cnt;
@@ -1636,7 +1636,7 @@ abstract class CRM_Import_Parser implements UserJobInterface {
       $comparisonValue = $this->getComparisonValue($importedValue);
       return $options[$comparisonValue] ?? 'invalid_import_value';
     }
-    if (!empty($fieldMetadata['FKClassName']) || !empty($fieldMetadata['pseudoconstant']['prefetch'])) {
+    if (!empty($fieldMetadata['FKClassName']) || ($fieldMetadata['pseudoconstant']['prefetch'] ?? NULL) === 'disabled') {
       // @todo - make this generic - for fields where getOptions doesn't fetch
       // getOptions does not retrieve these fields with high potential results
       if ($fieldName === 'event_id') {
@@ -1691,6 +1691,9 @@ abstract class CRM_Import_Parser implements UserJobInterface {
     $fieldMap = $this->getOddlyMappedMetadataFields();
     $fieldMapName = empty($fieldMap[$fieldName]) ? $fieldName : $fieldMap[$fieldName];
     $fieldMapName = str_replace('__', '.', $fieldMapName);
+    // See https://lab.civicrm.org/dev/core/-/issues/4317#note_91322 - a further hack for quickform not
+    // handling dots in field names. One day we will get rid of the Quick form screen...
+    $fieldMapName = str_replace('~~', '_.', $fieldMapName);
     // This whole business of only loading metadata for one type when we actually need it for all is ... dubious.
     if (empty($this->getImportableFieldsMetadata()[$fieldMapName])) {
       if ($loadOptions || !$limitToContactType) {
@@ -1954,7 +1957,7 @@ abstract class CRM_Import_Parser implements UserJobInterface {
    * @return int
    */
   protected function getSiteDefaultCountry(): int {
-    if (!isset($this->siteDefaultCountry)) {
+    if ($this->siteDefaultCountry === NULL) {
       $this->siteDefaultCountry = (int) Civi::settings()->get('defaultContactCountry');
     }
     return $this->siteDefaultCountry;
@@ -2211,7 +2214,9 @@ abstract class CRM_Import_Parser implements UserJobInterface {
     }
     //check if external identifier exists in database
     if ($contactID && $foundContact['id'] !== $contactID) {
-      throw new CRM_Core_Exception(ts('Existing external ID does not match the imported contact ID.'), CRM_Import_Parser::ERROR);
+      throw new CRM_Core_Exception(
+        ts('Imported external ID already belongs to an existing contact with a different contact ID than the imported contact ID or than the contact ID of the contact matched on the entity imported.'),
+        CRM_Import_Parser::ERROR);
     }
     return (int) $foundContact['id'];
   }

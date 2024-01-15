@@ -173,13 +173,12 @@ trait CRM_Core_Form_EntityFormTrait {
     $this->applyFilter('__ALL__', 'trim');
     $this->addEntityFieldsToTemplate();
     foreach ($this->entityFields as $index => $fields) {
-      $this->entityFields[$index] = array_merge([
+      $this->entityFields[$index] = array_replace_recursive([
         'template' => '',
-        'help' => [],
-        'pre_html_text' => '',
+        'help' => ['id' => '', 'file' => ''],
         'post_html_text' => '',
         'description' => '',
-        'documentation_link' => '',
+        'documentation_link' => ['page' => '', 'resource' => ''],
       ], $fields);
     }
     $this->assign('entityFields', $this->entityFields);
@@ -248,7 +247,7 @@ trait CRM_Core_Form_EntityFormTrait {
         $defaults[$fieldSpec['name']] = $value;
       }
       // Store a list of fields with money formatters
-      if (CRM_Utils_Array::value('formatter', $fieldSpec) == 'crmMoney') {
+      if (($fieldSpec['formatter'] ?? NULL) == 'crmMoney') {
         $moneyFields[] = $entityFieldName;
       }
     }

@@ -17,19 +17,13 @@
 class CRM_Mailing_BAO_MailingComponent extends CRM_Mailing_DAO_MailingComponent {
 
   /**
-   * Retrieve DB object and copy to defaults array.
-   *
-   * @param array $params
-   *   Array of criteria values.
-   * @param array $defaults
-   *   Array to be populated with found values.
-   *
-   * @return self|null
-   *   The DAO object, if found.
-   *
    * @deprecated
+   * @param array $params
+   * @param array $defaults
+   * @return self|null
    */
   public static function retrieve($params, &$defaults) {
+    CRM_Core_Error::deprecatedFunctionWarning('API');
     return self::commonRetrieve(self::class, $params, $defaults);
   }
 
@@ -64,7 +58,7 @@ class CRM_Mailing_BAO_MailingComponent extends CRM_Mailing_DAO_MailingComponent 
 
     $component->copyValues($params);
     if (empty($id) && empty($params['body_text'])) {
-      $component->body_text = CRM_Utils_String::htmlToText(CRM_Utils_Array::value('body_html', $params));
+      $component->body_text = CRM_Utils_String::htmlToText($params['body_html'] ?? '');
     }
 
     if ($component->is_default) {

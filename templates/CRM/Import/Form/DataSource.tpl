@@ -19,11 +19,8 @@
     </div>
   {/if}
   <div class="help">
-    {ts 1=$importEntity 2= $importEntities}The %1 Import Wizard allows you to easily upload %2 from other applications into CiviCRM.{/ts}
-    {ts}Files to be imported must be in the 'comma-separated-values' format (CSV) and must contain data needed to match an existing contact in your CiviCRM database.{/ts} {help id='upload'}
+    {ts 1=$importEntity 2=$importEntities}The %1 Import Wizard allows you to easily upload %2 from other applications into CiviCRM.{/ts}
   </div>
-
-  <div class="crm-submit-buttons">{include file="CRM/common/formButtons.tpl" location="top"}</div>
   <div id="choose-data-source" class="form-item">
     <h3>{ts}Choose Data Source{/ts}</h3>
     <table class="form-layout">
@@ -39,7 +36,7 @@
       {/if}
       <tr class="crm-import-datasource-form-block-dataSource">
         <td class="label">{$form.dataSource.label}</td>
-        <td>{$form.dataSource.html} {help id='data-source-selection'}</td>
+        <td>{$form.dataSource.html} {help id='data-source-selection'  file='CRM/Contact/Import/Form/DataSource'}</td>
       </tr>
     </table>
   </div>
@@ -53,7 +50,7 @@
       {if array_key_exists('contactType', $form)}
         <tr class="crm-import-uploadfile-from-block-contactType">
           <td class="label">{$form.contactType.label}</td>
-          <td>{$form.contactType.html}{help id='contact-type'}<br />
+          <td>{$form.contactType.html} {help id='contact-type' file='CRM/Contact/Import/Form/DataSource'}<br />
             {if $importEntity !== 'Contact'}
               <span class="description">
                 {ts 1=$importEntities}Select 'Individual' if you are importing %1 made by individual persons.{/ts}
@@ -73,7 +70,7 @@
       {if array_key_exists('onDuplicate', $form)}
         <tr class="crm-import-uploadfile-from-block-onDuplicate">
           <td class="label">{$form.onDuplicate.label}</td>
-          <td>{$form.onDuplicate.html} {help id="id-onDuplicate"}</td>
+          <td>{$form.onDuplicate.html} {help id="dupes"}</td>
         </tr>
       {/if}
       {if array_key_exists('dedupe_rule_id', $form)}
@@ -89,9 +86,6 @@
         </tr>
       {/if}
       <tr class="crm-import-uploadfile-form-block-date">{include file="CRM/Core/Date.tpl"}</tr>
-      <tr>
-        <td></td><td class="description">{ts}Select the format that is used for date fields in your import data.{/ts}</td>
-      </tr>
 
       {if array_key_exists('doGeocodeAddress', $form)}
           <tr class="crm-import-datasource-form-block-doGeocodeAddress">
@@ -115,9 +109,7 @@
        {if array_key_exists('savedMapping', $form)}
          <tr class="crm-import-uploadfile-form-block-savedMapping">
            <td class="label"><label for="savedMapping">{$form.savedMapping.label}</label></td>
-           <td>{$form.savedMapping.html}<br />
-             {if !$form.savedMapping.frozen}<span class="description">{ts}If you want to use a previously saved import field mapping - select it here.{/ts}</span>{/if}
-           </td>
+           <td>{$form.savedMapping.html}</td>
          </tr>
        {/if}
     </table>
@@ -154,7 +146,7 @@
     function buildSubTypes( )
     {
       element = cj('input[name="contactType"]:checked').val( );
-      var postUrl = {/literal}"{crmURL p='civicrm/ajax/subtype' h=0 }"{literal};
+      var postUrl = {/literal}"{crmURL p='civicrm/ajax/subtype' h=0}"{literal};
       var param = 'parentId='+ element;
       cj.ajax({ type: "POST", url: postUrl, data: param, async: false, dataType: 'json',
         success: function(subtype)
@@ -179,7 +171,7 @@
     function buildDedupeRules( )
     {
       element = cj("input[name=contactType]:checked").val();
-      var postUrl = {/literal}"{crmURL p='civicrm/ajax/dedupeRules' h=0 }"{literal};
+      var postUrl = {/literal}"{crmURL p='civicrm/ajax/dedupeRules' h=0}"{literal};
       var param = 'parentId='+ element;
       cj.ajax({ type: "POST", url: postUrl, data: param, async: false, dataType: 'json',
         success: function(dedupe){
@@ -208,4 +200,3 @@
     {literal}<script type="text/javascript">CRM.$('#use_existing_upload').prop('checked',true).change();</script>{/literal}
   {/if}
 </div>
-

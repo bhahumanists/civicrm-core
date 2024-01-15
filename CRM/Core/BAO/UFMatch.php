@@ -179,15 +179,6 @@ class CRM_Core_BAO_UFMatch extends CRM_Core_DAO_UFMatch {
       if (!empty($_POST) && !$isLogin) {
         $dedupeParameters = $_POST;
         $dedupeParameters['email'] = $uniqId;
-        // dev/core#1858 Ensure that if we have a contactID parameter which is
-        // set in the Create user Record contact task form. That this contactID
-        // value is passed through as the contact_id to the get duplicate
-        // contacts function. This is necessary because for Drupal 8 this
-        // function gets invoked. Before the civicrm_uf_match record is added
-        // where as in D7 it isn't called until the user tries to actually login.
-        if (!empty($dedupeParameters['contactID'])) {
-          $dedupeParameters['contact_id'] = $dedupeParameters['contactID'];
-        }
 
         $ids = CRM_Contact_BAO_Contact::getDuplicateContacts($dedupeParameters, 'Individual', 'Unsupervised', [], FALSE);
 
@@ -239,6 +230,16 @@ AND    domain_id = %2
           'user' => $user,
           'uniqId' => $uniqId,
         ]);
+        // dev/core#1858 Ensure that if we have a contactID parameter
+        // set in the Create user Record contact task form that this contactID
+        // value is passed through as the contact_id to the contact create.
+        // This is necessary because for Drupal 8 synchronizeUFMatch gets
+        // invoked before the civicrm_uf_match record is added whereas in D7
+        // it isn't called until later.
+        // Note this is taken from our dedupeParameters from earlier.
+        if (empty($contactParameters['contact_id']) && !empty($dedupeParameters['contactID'])) {
+          $contactParameters['contact_id'] = $dedupeParameters['contactID'];
+        }
 
         if ($ctype === 'Organization') {
           $contactParameters['organization_name'] = $uniqId;
@@ -538,8 +539,7 @@ AND    domain_id    = %4
   }
 
   /**
-   * Get the next unused uf_id value, since the standalone UF doesn't
-   * have id's (it uses OpenIDs, which go in a different field).
+   * Get the next unused uf_id value
    *
    * @deprecated
    * @return int
@@ -550,13 +550,13 @@ AND    domain_id    = %4
     $query = "SELECT MAX(uf_id)+1 AS next_uf_id FROM civicrm_uf_match";
     $dao = CRM_Core_DAO::executeQuery($query);
     if ($dao->fetch()) {
-      $ufId = $dao->next_uf_id;
+      $ufID = $dao->next_uf_id;
     }
 
-    if (!isset($ufId)) {
-      $ufId = 1;
+    if (!isset($ufID)) {
+      $ufID = 1;
     }
-    return $ufId;
+    return $ufID;
   }
 
   /**
@@ -615,13 +615,44 @@ AND    domain_id    = %4
   }
 
   /**
+   * @param string|null $entityName
+   * @param int|null $userId
+   * @param array $conditions
    * @inheritDoc
    */
-  public function addSelectWhereClause() {
+  public function addSelectWhereClause(string $entityName = NULL, int $userId = NULL, array $conditions = []): array {
     // Prevent default behavior of joining ACLs onto the contact_id field.
     $clauses = [];
-    CRM_Utils_Hook::selectWhereClause($this, $clauses);
+    CRM_Utils_Hook::selectWhereClause($this, $clauses, $userId, $conditions);
     return $clauses;
+  }
+
+  /**
+   * This checks and adds a unique index on (uf_id,domain_id)
+   *
+   * @return bool
+   * @throws \Civi\Core\Exception\DBQueryException
+   */
+  public static function tryToAddUniqueIndexOnUfId(): bool {
+    if (!CRM_Core_BAO_SchemaHandler::checkIfIndexExists('civicrm_uf_match', 'UI_uf_match_uf_id_domain_id')) {
+      // Run a query to check if we have duplicates
+      $query = 'SELECT COUNT(*) FROM civicrm_uf_match
+GROUP BY uf_id,domain_id
+HAVING COUNT(*) > 1';
+      $dao = CRM_Core_DAO::executeQuery($query);
+      if ($dao->fetch()) {
+        // Tell the user they need to fix it manually
+        \Civi::log()->error('You have multiple records with the same uf_id in civicrm_uf_match. You need to manually fix this in the database so that uf_id is unique.');
+        return FALSE;
+      }
+      else {
+        // Add the unique index
+        CRM_Core_DAO::executeQuery("
+        ALTER TABLE civicrm_uf_match ADD UNIQUE INDEX UI_uf_match_uf_id_domain_id (uf_id,domain_id);
+      ");
+      }
+    }
+    return TRUE;
   }
 
 }

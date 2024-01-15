@@ -445,8 +445,8 @@ class CRM_Utils_REST {
     if (!empty($requestParams['json'])) {
       $params = json_decode($requestParams['json'], TRUE);
     }
-    $entity = CRM_Utils_String::munge(CRM_Utils_Array::value('entity', $requestParams));
-    $action = CRM_Utils_String::munge(CRM_Utils_Array::value('action', $requestParams));
+    $entity = CRM_Utils_String::munge($requestParams['entity'] ?? '');
+    $action = CRM_Utils_String::munge($requestParams['action'] ?? '');
     if (!is_array($params)) {
       CRM_Utils_JSON::output([
         'is_error' => 1,
@@ -656,11 +656,7 @@ class CRM_Utils_REST {
       // <header> Browsers often retain list of credentials and re-send automatically.
     ];
 
-    if (!empty($authx) && in_array($authx['flow'], $allowFlows)) {
-      return TRUE;
-    }
-
-    return FALSE;
+    return (!empty($authx) && in_array($authx['flow'], $allowFlows));
   }
 
 }

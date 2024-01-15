@@ -48,10 +48,10 @@ class CRM_Core_BAO_OptionValue extends CRM_Core_DAO_OptionValue implements \Civi
    * @param array $params
    */
   public static function setDefaults(&$params) {
-    $params['label'] = $params['label'] ?? $params['name'];
-    $params['name'] = $params['name'] ?? CRM_Utils_String::titleToVar($params['label']);
-    $params['weight'] = $params['weight'] ?? self::getDefaultWeight($params);
-    $params['value'] = $params['value'] ?? self::getDefaultValue($params);
+    $params['label'] ??= $params['name'];
+    $params['name'] ??= CRM_Utils_String::titleToVar($params['label']);
+    $params['weight'] ??= self::getDefaultWeight($params);
+    $params['value'] ??= self::getDefaultValue($params);
   }
 
   /**
@@ -90,17 +90,10 @@ class CRM_Core_BAO_OptionValue extends CRM_Core_DAO_OptionValue implements \Civi
   }
 
   /**
-   * Retrieve DB object and copy to defaults array.
-   *
-   * @param array $params
-   *   Array of criteria values.
-   * @param array $defaults
-   *   Array to be populated with found values.
-   *
-   * @return self|null
-   *   The DAO object, if found.
-   *
    * @deprecated
+   * @param array $params
+   * @param array $defaults
+   * @return self|null
    */
   public static function retrieve($params, &$defaults) {
     return self::commonRetrieve(self::class, $params, $defaults);

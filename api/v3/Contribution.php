@@ -392,7 +392,6 @@ function _civicrm_api3_contribute_format_params($params, &$values) {
  * @throws Exception
  */
 function civicrm_api3_contribution_sendconfirmation($params) {
-  $ids = [];
   $allowedParams = [
     'receipt_from_email',
     'receipt_from_name',
@@ -402,9 +401,16 @@ function civicrm_api3_contribution_sendconfirmation($params) {
     'receipt_text',
     'pay_later_receipt',
     'payment_processor_id',
+    'model',
   ];
   $input = array_intersect_key($params, array_flip($allowedParams));
-  CRM_Contribute_BAO_Contribution::sendMail($input, $ids, $params['id']);
+  if (!isset($input['model'])) {
+    $input['model'] = [
+      // Pass through legacy receipt_text.
+      'userEnteredText' => $input['tplParams']['receipt_text'] ?? NULL,
+    ];
+  }
+  CRM_Contribute_BAO_Contribution::sendMail($input, [], $params['id']);
   return [];
 }
 
@@ -484,7 +490,7 @@ function civicrm_api3_contribution_completetransaction($params): array {
     throw new CRM_Core_Exception(ts('Contribution already completed'), 'contribution_completed');
   }
 
-  $params['trxn_id'] = $params['trxn_id'] ?? $contribution->trxn_id;
+  $params['trxn_id'] ??= $contribution->trxn_id;
 
   $passThroughParams = [
     'fee_amount',
@@ -666,12 +672,9 @@ function civicrm_api3_contribution_repeattransaction($params) {
     $input['receipt_from_email'] = ($params['receipt_from_email'] ?? NULL) ?: $domainFromEmail;
   }
 
-  // @todo this should call CRM_Contribute_BAO_Contribution::repeatTransaction - some minor cleanup needed to separate
-  // from completeOrder
-  return CRM_Contribute_BAO_Contribution::completeOrder($input,
-    $templateContribution['contribution_recur_id'],
-    NULL,
-    $params['is_post_payment_create'] ?? NULL);
+  return CRM_Contribute_BAO_Contribution::repeatTransaction($input,
+    $templateContribution['contribution_recur_id']
+  );
 }
 
 /**

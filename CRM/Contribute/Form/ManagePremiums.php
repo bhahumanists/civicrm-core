@@ -195,14 +195,14 @@ class CRM_Contribute_Form_ManagePremiums extends CRM_Contribute_Form {
   public static function formRule($params, $files) {
 
     // If choosing to upload an image, then an image must be provided
-    if (CRM_Utils_Array::value('imageOption', $params) == 'image'
+    if (($params['imageOption'] ?? NULL) == 'image'
       && empty($files['uploadFile']['name'])
     ) {
       $errors['uploadFile'] = ts('A file must be selected');
     }
 
     // If choosing to use image URLs, then both URLs must be present
-    if (CRM_Utils_Array::value('imageOption', $params) == 'thumbnail') {
+    if (($params['imageOption'] ?? NULL) == 'thumbnail') {
       if (!$params['imageUrl']) {
         $errors['imageUrl'] = ts('Image URL is Required');
       }
@@ -264,7 +264,7 @@ class CRM_Contribute_Form_ManagePremiums extends CRM_Contribute_Form {
       catch (CRM_Core_Exception $e) {
         $message = ts("This Premium is linked to an <a href='%1'>Online Contribution page</a>. Please remove it before deleting this Premium.", [1 => CRM_Utils_System::url('civicrm/admin/contribute', 'reset=1')]);
         CRM_Core_Session::setStatus($message, ts('Cannot delete Premium'), 'error');
-        CRM_Core_Session::singleton()->pushUserContext(CRM_Utils_System::url('civicrm/admin/contribute/managePremiums', 'reset=1&action=browse'));
+        CRM_Core_Session::singleton()->pushUserContext(CRM_Utils_System::url('civicrm/admin/contribute/managePremiums', 'reset=1'));
         return;
       }
       CRM_Core_Session::setStatus(

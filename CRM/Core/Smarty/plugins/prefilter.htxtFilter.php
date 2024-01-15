@@ -6,10 +6,9 @@
  * evaluate unassigned variables.
  *
  * @param string $tpl_source
- * @param $smarty
  * @return string
  */
-function smarty_prefilter_htxtFilter($tpl_source, &$smarty) {
+function smarty_prefilter_htxtFilter($tpl_source) {
   if (strpos($tpl_source, '{htxt') === FALSE) {
     return $tpl_source;
   }
@@ -18,7 +17,15 @@ function smarty_prefilter_htxtFilter($tpl_source, &$smarty) {
   $_htxts = 0;
 
   $result = preg_replace_callback_array([
-    '/\{htxt id=([\'\"][^\'\"]+[\'\"])/' => function ($m) use (&$htxts) {
+    '/\{htxt id=(\"[-\w]+\")[ }]/' => function ($m) use (&$htxts) {
+      $htxts++;
+      return sprintf('{if $id == %s}%s', $m[1], $m[0]);
+    },
+    '/\{htxt id=(\'[-\w]+\')[ }]/' => function ($m) use (&$htxts) {
+      $htxts++;
+      return sprintf('{if $id == %s}%s', $m[1], $m[0]);
+    },
+    '/\{htxt id=(\$\w+)[ }]/' => function ($m) use (&$htxts) {
       $htxts++;
       return sprintf('{if $id == %s}%s', $m[1], $m[0]);
     },

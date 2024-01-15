@@ -2,31 +2,35 @@
 (function (angular, $, _) {
 
   var uidCount = 0,
-    pageTitle = 'CiviCRM',
+    pageTitleHTML = 'CiviCRM',
     documentTitle = 'CiviCRM';
 
   angular.module('crmUi', CRM.angRequires('crmUi'))
 
-    // example <div crm-ui-accordion crm-title="ts('My Title')" crm-collapsed="true">...content...</div>
-    // WISHLIST: crmCollapsed should support two-way/continuous binding
+    // example <div crm-ui-accordion="{title: ts('My Title'), collapsed: true}">...content...</div>
+    // @deprecated: just use <details><summary> markup
     .directive('crmUiAccordion', function() {
       return {
         scope: {
           crmUiAccordion: '='
         },
-        template: '<div ng-class="cssClasses"><div class="crm-accordion-header">{{crmUiAccordion.title}} <a crm-ui-help="help" ng-if="help"></a></div><div class="crm-accordion-body" ng-transclude></div></div>',
+        template: '<details class="crm-accordion-wrapper"><summary class="crm-accordion-header">{{crmUiAccordion.title}} <a crm-ui-help="help" ng-if="help"></a></summary><div class="crm-accordion-body" ng-transclude></div></details>',
         transclude: true,
         link: function (scope, element, attrs) {
-          scope.cssClasses = {
-            'crm-accordion-wrapper': true,
-            collapsed: scope.crmUiAccordion.collapsed
-          };
           scope.help = null;
-          scope.$watch('crmUiAccordion', function(crmUiAccordion) {
-            if (crmUiAccordion && crmUiAccordion.help) {
-              scope.help = crmUiAccordion.help.clone({}, {
-                title: crmUiAccordion.title
-              });
+          let openSet = false;
+          scope.$watch('crmUiAccordion', function(crmUiAccordion, oldVal) {
+            if (crmUiAccordion) {
+              // Only process this once
+              if (!openSet) {
+                $(element).children('details').prop('open', !crmUiAccordion.collapsed);
+                openSet = true;
+              }
+              if (crmUiAccordion.help) {
+                scope.help = crmUiAccordion.help.clone({}, {
+                  title: crmUiAccordion.title
+                });
+              }
             }
           });
         }
@@ -399,24 +403,28 @@
         require: '?ngModel',
         link: function (scope, elm, attr, ngModel) {
 
-          var editor = CRM.wysiwyg.create(elm);
-          if (!ngModel) {
-            return;
-          }
+          // Wait for #id to stabilize so the wysiwyg doesn't init with an id like `cke_{{:: fieldId }}`
+          $timeout(function() {
+            var editor = CRM.wysiwyg.create(elm);
 
-          if (attr.ngBlur) {
-            $(elm).on('blur', function() {
-              $timeout(function() {
-                scope.$eval(attr.ngBlur);
+            if (!ngModel) {
+              return;
+            }
+
+            if (attr.ngBlur) {
+              $(elm).on('blur', function() {
+                $timeout(function() {
+                  scope.$eval(attr.ngBlur);
+                });
               });
-            });
-          }
+            }
 
-          ngModel.$render = function(value) {
-            editor.done(function() {
-              CRM.wysiwyg.setVal(elm, ngModel.$viewValue || '');
-            });
-          };
+            ngModel.$render = function(value) {
+              editor.done(function() {
+                CRM.wysiwyg.setVal(elm, ngModel.$viewValue || '');
+              });
+            };
+          });
         }
       };
     })
@@ -725,6 +733,7 @@
           crmAutocompleteParams: '<',
           multi: '<',
           autoOpen: '<',
+          quickAdd: '<',
           staticOptions: '<'
         },
         link: function(scope, element, attr, ctrl) {
@@ -753,7 +762,14 @@
           if (ctrl.ngModel) {
             // Ensure widget is updated when model changes
             ctrl.ngModel.$render = function() {
-              element.val(ctrl.ngModel.$viewValue || '');
+              // Trigger change so the Select2 renders the current value,
+              // but only if the value has actually changed (to avoid recursion)
+              // We need to coerce null|false in the model to '' and numbers to strings.
+              // We need 0 not to be equivalent to null|false|''
+              const newValue = (ctrl.ngModel.$viewValue === null || ctrl.ngModel.$viewValue === undefined || ctrl.ngModel.$viewValue === false) ? '' : ctrl.ngModel.$viewValue.toString();
+              if (newValue !== element.val().toString()) {
+                element.val(newValue).change();
+              }
             };
 
             // Copied from ng-list
@@ -775,11 +791,12 @@
           this.$onChanges = function() {
             // Timeout is to wait for `placeholder="{{ ts(...) }}"` to be resolved
             $timeout(function() {
-              $element.crmAutocomplete(ctrl.entity, ctrl.crmAutocompleteParams, {
+              $element.crmAutocomplete(ctrl.entity, ctrl.crmAutocompleteParams || {}, {
                 multiple: ctrl.multi,
                 // Only auto-open if there are no static options
                 minimumInputLength: ctrl.autoOpen && _.isEmpty(ctrl.staticOptions) ? 0 : 1,
                 static: ctrl.staticOptions || [],
+                quickAdd: ctrl.quickAdd,
               });
             });
           };
@@ -1173,7 +1190,7 @@
     // WARNING: Use only once per route!
     // WARNING: This directive works only if your AngularJS base page does not
     // set a custom title (i.e., it has an initial title of "CiviCRM"). See the
-    // global variables pageTitle and documentTitle.
+    // global variables pageTitleHTML and documentTitle.
     // Example (same title for both): <h1 crm-page-title>{{ts('Hello')}}</h1>
     // Example (separate document title): <h1 crm-document-title="ts('Hello')" crm-page-title><i class="crm-i fa-flag" aria-hidden="true"></i>{{ts('Hello')}}</h1>
     .directive('crmPageTitle', function($timeout) {
@@ -1184,27 +1201,22 @@
         link: function(scope, $el, attrs) {
           function update() {
             $timeout(function() {
-              var newPageTitle = _.trim($el.html()),
+              var newPageTitleHTML = $el.html().trim(),
                 newDocumentTitle = scope.crmDocumentTitle || $el.text(),
-                h1Count = 0,
                 dialog = $el.closest('.ui-dialog-content');
               if (dialog.length) {
                 dialog.dialog('option', 'title', newDocumentTitle);
                 $el.hide();
               } else {
                 document.title = $('title').text().replace(documentTitle, newDocumentTitle);
-                // If the CMS has already added title markup to the page, use it
-                $('h1').not('.crm-container h1').each(function () {
-                  if ($(this).hasClass('crm-page-title') || _.trim($(this).html()) === pageTitle) {
-                    $(this).addClass('crm-page-title').html(newPageTitle);
+                [].forEach.call(document.querySelectorAll('h1:not(.crm-container h1), .crm-page-title-wrapper>h1'), h1 => {
+                  if (h1.classList.contains('crm-page-title') || h1.innerHTML.trim() === pageTitleHTML) {
+                    h1.classList.add('crm-page-title');
+                    h1.innerHTML = newPageTitleHTML;
                     $el.hide();
-                    ++h1Count;
                   }
                 });
-                if (!h1Count) {
-                  $el.show();
-                }
-                pageTitle = newPageTitle;
+                pageTitleHTML = newPageTitleHTML;
                 documentTitle = newDocumentTitle;
               }
             });
@@ -1230,7 +1242,7 @@
           var ts = CRM.ts();
 
           function read() {
-            var htmlVal = element.html();
+            var htmlVal = element.text();
             if (!htmlVal) {
               htmlVal = scope.defaultValue || '';
               element.text(htmlVal);

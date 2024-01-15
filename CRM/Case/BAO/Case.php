@@ -71,30 +71,33 @@ class CRM_Case_BAO_Case extends CRM_Case_DAO_Case implements \Civi\Core\HookInte
     if ($e->entity === 'Activity' && in_array($e->action, ['create', 'edit'])) {
       /** @var CRM_Activity_DAO_Activity $activity */
       $activity = $e->object;
+      $params = $e->params;
 
       // If subject contains a ‘[case #…]’ string, file activity on the related case (CRM-5916)
       $matches = [];
-      $subjectToMatch = $activity->subject ?? '';
-      if (preg_match('/\[case #([0-9a-h]{7})\]/', $subjectToMatch, $matches)) {
-        $key = CRM_Core_DAO::escapeString(CIVICRM_SITE_KEY);
-        $hash = $matches[1];
-        $query = "SELECT id FROM civicrm_case WHERE SUBSTR(SHA1(CONCAT('$key', id)), 1, 7) = '" . CRM_Core_DAO::escapeString($hash) . "'";
-      }
-      elseif (preg_match('/\[case #(\d+)\]/', $subjectToMatch, $matches)) {
-        $query = "SELECT id FROM civicrm_case WHERE id = '" . CRM_Core_DAO::escapeString($matches[1]) . "'";
+      if (!isset($params['case_id'])) {
+        $subjectToMatch = $activity->subject ?? '';
+        if (preg_match('/\[case #([0-9a-h]{7})\]/', $subjectToMatch, $matches)) {
+          $key = CRM_Core_DAO::escapeString(CIVICRM_SITE_KEY);
+          $query = "SELECT id FROM civicrm_case WHERE SUBSTR(SHA1(CONCAT('$key', id)), 1, 7) = %1";
+        }
+        elseif (preg_match('/\[case #(\d+)\]/', $subjectToMatch, $matches)) {
+          $query = "SELECT id FROM civicrm_case WHERE id = %1";
+        }
       }
       if (!empty($matches)) {
-        $caseParams = [
-          'activity_id' => $activity->id,
-          'case_id' => CRM_Core_DAO::singleValueQuery($query),
-        ];
-        if ($caseParams['case_id']) {
-          CRM_Case_BAO_Case::processCaseActivity($caseParams);
-        }
-        else {
+        $params['case_id'] = CRM_Core_DAO::singleValueQuery($query, [1 => [$matches[1], 'String']]) ?: NULL;
+        if (!$params['case_id']) {
           CRM_Activity_BAO_Activity::logActivityAction($activity, "Case details for {$matches[1]} not found while recording an activity on case.");
         }
       }
+      // Add CaseActivity record (or remove if $params['case_id'] is falsey)
+      if (isset($params['case_id'])) {
+        CRM_Case_BAO_Case::updateCaseActivity($activity->id, $params['case_id']);
+      }
+    }
+    if ($e->entity === 'RelationshipType') {
+      CRM_Case_XMLProcessor::flushStaticCaches();
     }
   }
 
@@ -636,7 +639,7 @@ HERESQL;
 
     $order = NULL;
     if (!empty($params['sortBy'])) {
-      if (strstr($params['sortBy'], 'date ')) {
+      if (str_contains($params['sortBy'], 'date ')) {
         $params['sortBy'] = str_replace('date', 'activity_date_time', $params['sortBy']);
       }
       $order = "ORDER BY " . $params['sortBy'];
@@ -696,13 +699,14 @@ HERESQL;
       $casesList[$key]['manager'] = self::getCaseManagerContact($caseTypes[$case['case_type_id']], $case['case_id']);
 
       $casesList[$key]['date'] = $activityTypeLabels[$case['activity_type_id']] ?? NULL;
-      if ($actId = CRM_Utils_Array::value('activity_id', $case)) {
+      $actId = $case['activity_id'] ?? NULL;
+      if ($actId) {
         if (self::checkPermission($actId, 'view', $case['activity_type_id'], $userID)) {
           if ($type == 'recent') {
             $casesList[$key]['date'] = sprintf('<a class="action-item crm-hover-button" href="%s" title="%s">%s</a>',
               CRM_Utils_System::url('civicrm/case/activity/view', ['reset' => 1, 'cid' => $case['contact_id'], 'aid' => $case['activity_id']]),
               ts('View activity'),
-              CRM_Utils_Array::value($case['activity_type_id'], $activityTypeLabels)
+              $activityTypeLabels[$case['activity_type_id']] ?? ''
             );
           }
           else {
@@ -711,7 +715,7 @@ HERESQL;
               $status,
               CRM_Utils_System::url('civicrm/case/activity/view', ['reset' => 1, 'cid' => $case['contact_id'], 'aid' => $case['activity_id']]),
               ts('View activity'),
-              CRM_Utils_Array::value($case['activity_type_id'], $activityTypeLabels)
+              $activityTypeLabels[$case['activity_type_id']] ?? ''
             );
           }
         }
@@ -764,17 +768,19 @@ HERESQL;
 
     $caseTypes = CRM_Case_PseudoConstant::caseType();
     $caseStatuses = CRM_Case_PseudoConstant::caseStatus();
-    $caseTypes = array_flip($caseTypes);
 
     // get statuses as headers for the table
     $url = CRM_Utils_System::url('civicrm/case/search', "reset=1&force=1&all=1&case_status_id=");
-    foreach ($caseStatuses as $key => $name) {
-      $caseSummary['headers'][$key]['status'] = $name;
+    $rows = [];
+    foreach ($caseStatuses as $key => $caseStatusLabel) {
+      $caseSummary['headers'][$key]['status'] = $caseStatusLabel;
       $caseSummary['headers'][$key]['url'] = $url . $key;
+      foreach ($caseTypes as $caseTypeLabel) {
+        $rows[$caseTypeLabel][$caseStatusLabel] = ['count' => NULL, 'url' => NULL];
+      }
     }
 
     // build rows with actual data
-    $rows = [];
     $myGroupByClause = $mySelectClause = $myCaseFromClause = $myCaseWhereClauseA = $myCaseWhereClauseB = '';
 
     if ($allCases) {
@@ -823,10 +829,7 @@ SELECT civicrm_case.id, case_status.label AS case_status, status_id, civicrm_cas
 
     $res = CRM_Core_DAO::executeQuery($query);
     while ($res->fetch()) {
-      if (!isset($rows[$res->case_type])) {
-        $rows[$res->case_type] = array_fill_keys($caseStatuses, []);
-      }
-      if (!empty($rows[$res->case_type]) && !empty($rows[$res->case_type][$res->case_status])) {
+      if (!empty($rows[$res->case_type][$res->case_status]['count'])) {
         $rows[$res->case_type][$res->case_status]['count'] = $rows[$res->case_type][$res->case_status]['count'] + 1;
       }
       else {
@@ -838,7 +841,7 @@ SELECT civicrm_case.id, case_status.label AS case_status, status_id, civicrm_cas
         ];
       }
     }
-    $caseSummary['rows'] = array_merge($caseTypes, $rows);
+    $caseSummary['rows'] = $rows;
 
     return $caseSummary;
   }
@@ -1357,7 +1360,7 @@ HERESQL;
     $tplParams['activityTypeName'] = CRM_Core_PseudoConstant::getLabel('CRM_Activity_DAO_Activity', 'activity_type_id', $activityTypeId);
     $tplParams['activity'] = $activityInfo;
     foreach ($tplParams['activity']['fields'] as $k => $val) {
-      if (CRM_Utils_Array::value('label', $val) == ts('Subject')) {
+      if (($val['label'] ?? NULL) == ts('Subject')) {
         $activitySubject = $val['value'];
         break;
       }
@@ -1400,9 +1403,8 @@ HERESQL;
 
       $displayName = $info['display_name'] ?? NULL;
 
-      [$result[CRM_Utils_Array::value('contact_id', $info)], $subject, $message, $html] = CRM_Core_BAO_MessageTemplate::sendTemplate(
+      [$result[$info['contact_id'] ?? NULL], $subject, $message, $html] = CRM_Core_BAO_MessageTemplate::sendTemplate(
         [
-          'groupName' => 'msg_tpl_workflow_case',
           'workflow' => 'case_activity',
           'contactId' => $info['contact_id'] ?? NULL,
           'tplParams' => $tplParams,
@@ -1410,6 +1412,12 @@ HERESQL;
           'toName' => $displayName,
           'toEmail' => $mail,
           'attachments' => $attachments,
+          'modelProps' => $caseId ? [
+            'activityID' => $activityId,
+            'caseID' => $caseId,
+          ] : [
+            'activityID' => $activityId,
+          ],
         ]
       );
 
@@ -1431,7 +1439,7 @@ HERESQL;
         $recordedActivityParams['target_contact_id'][] = $info['contact_id'];
       }
       else {
-        unset($result[CRM_Utils_Array::value('contact_id', $info)]);
+        unset($result[$info['contact_id'] ?? NULL]);
       }
     }
 
@@ -1898,7 +1906,7 @@ HERESQL;
 
     $whereClause = "mainCase.id = %2";
     if ($excludeDeleted) {
-      $whereClause .= " AND ( relAct.is_deleted = 0 OR relAct.is_deleted IS NULL )";
+      $whereClause .= " AND relAct.is_deleted = 0";
     }
 
     $query = "
@@ -1941,7 +1949,7 @@ HERESQL;
 
     $whereClause = 'relCase.id IN ( ' . implode(',', $relatedCaseIds) . ' )';
     if ($excludeDeleted) {
-      $whereClause .= " AND ( relCase.is_deleted = 0 OR relCase.is_deleted IS NULL )";
+      $whereClause .= " AND relCase.is_deleted = 0";
     }
 
     //filter for permissioned cases.
@@ -2499,7 +2507,7 @@ WHERE id IN (' . implode(',', $copiedActivityIds) . ')';
     $actionOperations = ['view', 'edit', 'delete'];
     if (in_array($operation, $actionOperations)) {
 
-      //do cache when user has non/supper permission.
+      // Do cache when user has non-super permission.
       static $allowOperations;
 
       if (!is_array($allowOperations) ||
@@ -2538,12 +2546,8 @@ WHERE id IN (' . implode(',', $copiedActivityIds) . ')';
         //has permissions.
         if (!empty($hasPermissions)) {
           //need to check activity object specific.
-          if (in_array($operation, [
-            'view',
-            'edit',
-          ])
-          ) {
-            //do we have supper permission.
+          if (in_array($operation, ['view', 'edit'])) {
+            // Check for super permission.
             if (in_array('access all cases and activities', $hasPermissions[$operation])) {
               $allowOperations[$operation] = $allow = TRUE;
             }
@@ -2605,8 +2609,7 @@ WHERE id IN (' . implode(',', $copiedActivityIds) . ')';
         }
       }
       else {
-        //use cache.
-        //here contact might have supper/non permission.
+        // Use cache; user might have non-super permission.
         $allow = $allowOperations[$operation];
       }
     }
@@ -2706,13 +2709,9 @@ WHERE id IN (' . implode(',', $copiedActivityIds) . ')';
       return FALSE;
     }
 
-    if (CRM_Core_Permission::check('access my cases and activities') ||
-      CRM_Core_Permission::check('access all cases and activities')
-    ) {
-      return TRUE;
-    }
-
-    return FALSE;
+    return CRM_Core_Permission::check([
+      ['access my cases and activities', /* OR */ 'access all cases and activities'],
+    ]);
   }
 
   /**
@@ -2996,7 +2995,7 @@ WHERE id IN (' . implode(',', $copiedActivityIds) . ')';
 
       // Filter status id by case type id
       case 'status_id':
-        if (!empty($props['case_type_id'])) {
+        if (!empty($props['case_type_id']) && is_scalar($props['case_type_id'])) {
           $idField = is_numeric($props['case_type_id']) ? 'id' : 'name';
           $caseType = civicrm_api3('CaseType', 'getsingle', [$idField => $props['case_type_id'], 'return' => 'definition']);
           if (!empty($caseType['definition']['statuses'])) {
@@ -3009,34 +3008,51 @@ WHERE id IN (' . implode(',', $copiedActivityIds) . ')';
   }
 
   /**
+   * @param string|null $entityName
+   * @param int|null $userId
+   * @param array $conditions
    * @inheritDoc
    */
-  public function addSelectWhereClause() {
+  public function addSelectWhereClause(string $entityName = NULL, int $userId = NULL, array $conditions = []): array {
+    $administerCases = CRM_Core_Permission::check('administer CiviCase', $userId);
+    $viewMyCases = CRM_Core_Permission::check('access my cases and activities', $userId);
+    $viewAllCases = CRM_Core_Permission::check('access all cases and activities', $userId);
+
     // We always return an array with these keys, even if they are empty,
     // because this tells the query builder that we have considered these fields for acls
     $clauses = [
       'id' => [],
       // Only case admins can view deleted cases
-      'is_deleted' => CRM_Core_Permission::check('administer CiviCase') ? [] : ["= 0"],
+      'is_deleted' => $administerCases ? [] : ['= 0'],
     ];
-    // Ensure the user has permission to view the case client
-    $contactClause = CRM_Utils_SQL::mergeSubquery('Contact');
-    if ($contactClause) {
-      $contactClause = implode(' AND contact_id ', $contactClause);
-      $clauses['id'][] = "IN (SELECT case_id FROM civicrm_case_contact WHERE contact_id $contactClause)";
+
+    // No CiviCase access
+    if (!$viewAllCases && !$viewMyCases) {
+      $clauses['id'][] = 'IS NULL';
     }
-    // The api gatekeeper ensures the user has at least "access my cases and activities"
-    // so if they do not have permission to see all cases we'll assume they can only access their own
-    if (!CRM_Core_Permission::check('access all cases and activities')) {
-      $user = (int) CRM_Core_Session::getLoggedInContactID();
-      $clauses['id'][] = "IN (
-        SELECT r.case_id FROM civicrm_relationship r, civicrm_case_contact cc WHERE r.is_active = 1 AND cc.case_id = r.case_id AND (
-          (r.contact_id_a = cc.contact_id AND r.contact_id_b = $user) OR (r.contact_id_b = cc.contact_id AND r.contact_id_a = $user)
-        )
-      )";
+    else {
+      // Enforce permission to view the case client
+      $contactClause = CRM_Utils_SQL::mergeSubquery('Contact');
+      if ($contactClause) {
+        $contactClause = implode(' AND contact_id ', $contactClause);
+        $clauses['id'][] = "IN (SELECT case_id FROM civicrm_case_contact WHERE contact_id $contactClause)";
+      }
+      // User can only access their own cases
+      if (!$viewAllCases) {
+        $clauses['id'][] = self::getAccessMyCasesClause($userId);
+      }
     }
-    CRM_Utils_Hook::selectWhereClause($this, $clauses);
+    CRM_Utils_Hook::selectWhereClause($this, $clauses, $userId, $conditions);
     return $clauses;
+  }
+
+  private static function getAccessMyCasesClause(int $userId = NULL): string {
+    $user = $userId ?? (int) CRM_Core_Session::getLoggedInContactID();
+    return "IN (
+      SELECT r.case_id FROM civicrm_relationship r, civicrm_case_contact cc WHERE r.is_active = 1 AND cc.case_id = r.case_id AND (
+        (r.contact_id_a = cc.contact_id AND r.contact_id_b = $user) OR (r.contact_id_b = cc.contact_id AND r.contact_id_a = $user)
+      )
+    )";
   }
 
   /**

@@ -38,23 +38,23 @@ class CRM_Core_ErrorTest extends CiviUnitTestCase {
   /**
    * Make sure that formatBacktrace() accepts values from debug_backtrace()
    */
-  public function testFormatBacktrace_debug() {
+  public function testFormatBacktraceDebug(): void {
     $bt = debug_backtrace();
     $msg = CRM_Core_Error::formatBacktrace($bt);
-    $this->assertRegexp('/CRM_Core_ErrorTest->testFormatBacktrace_debug/', $msg);
+    $this->assertMatchesRegularExpression('/CRM_Core_ErrorTest->testFormatBacktraceDebug/', $msg);
   }
 
   /**
    * Make sure that formatBacktrace() accepts values from Exception::getTrace()
    */
-  public function testFormatBacktrace_exception() {
+  public function testFormatBacktraceException(): void {
     $e = new Exception('foo');
     $msg = CRM_Core_Error::formatBacktrace($e->getTrace());
-    $this->assertRegexp('/CRM_Core_ErrorTest->testFormatBacktrace_exception/', $msg);
+    $this->assertMatchesRegularExpression('/CRM_Core_ErrorTest->testFormatBacktraceException/', $msg);
   }
 
-  public function testExceptionLogging() {
-    $e = new \Exception("the exception");
+  public function testExceptionLogging(): void {
+    $e = new \Exception('the exception');
     Civi::log()->notice('There was an exception!', [
       'exception' => $e,
     ]);
@@ -92,7 +92,7 @@ class CRM_Core_ErrorTest extends CiviUnitTestCase {
     $logFiles = glob($config->configAndLogDir . '/CiviCRM*.log');
     $this->assertEquals(1, count($logFiles), 'Expect to find 1 file matching: ' . $config->configAndLogDir . '/CiviCRM*log*/');
     foreach ($logFiles as $logFile) {
-      $this->assertRegexp($pattern, file_get_contents($logFile));
+      $this->assertMatchesRegularExpression($pattern, file_get_contents($logFile));
     }
   }
 
@@ -107,7 +107,7 @@ class CRM_Core_ErrorTest extends CiviUnitTestCase {
     $log->log('Little lamb');
     $config = CRM_Core_Config::singleton();
     $fileContents = file_get_contents($log->_filename);
-    $this->assertEquals($config->configAndLogDir . 'CiviCRM.' . CIVICRM_DOMAIN_ID . '_' . 'my-test.' . CRM_Core_Error::generateLogFileHash($config) . '.log', $log->_filename);
+    $this->assertEquals($config->configAndLogDir . 'CiviCRM.' . CIVICRM_DOMAIN_ID . '.' . 'my-test.' . CRM_Core_Error::generateLogFileHash($config) . '.log', $log->_filename);
     // The 5 here is a bit arbitrary - on my local the date part is 15 chars (Mar 29 05:29:16) - but we are just checking that
     // there are chars for the date at the start.
     $this->assertTrue(strpos($fileContents, '[info] Mary had a little lamb') > 10);

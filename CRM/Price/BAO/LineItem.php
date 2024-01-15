@@ -257,13 +257,6 @@ WHERE li.contribution_id = %1";
         $getTaxDetails = TRUE;
       }
     }
-    if (Civi::settings()->get('invoicing')) {
-      // @todo - this is an inappropriate place to be doing form level assignments.
-      $taxTerm = Civi::settings()->get('tax_term');
-      $smarty = CRM_Core_Smarty::singleton();
-      $smarty->assign('taxTerm', $taxTerm);
-      $smarty->assign('getTaxDetails', $getTaxDetails);
-    }
     return $lineItems;
   }
 
@@ -311,7 +304,7 @@ WHERE li.contribution_id = %1";
       $qty = (float) $qty;
       $price = (float) ($amount_override === NULL ? $options[$oid]['amount'] : $amount_override);
 
-      $participantsPerField = (int) CRM_Utils_Array::value('count', $options[$oid], 0);
+      $participantsPerField = (int) ($options[$oid]['count'] ?? 0);
 
       $values[$oid] = [
         'price_field_id' => $fid,
@@ -329,7 +322,7 @@ WHERE li.contribution_id = %1";
         'auto_renew' => $options[$oid]['auto_renew'] ?? NULL,
         'html_type' => $fields['html_type'],
         'financial_type_id' => $options[$oid]['financial_type_id'] ?? NULL,
-        'tax_amount' => CRM_Utils_Array::value('tax_amount', $options[$oid], 0),
+        'tax_amount' => $options[$oid]['tax_amount'] ?? 0,
         'non_deductible_amount' => $options[$oid]['non_deductible_amount'] ?? NULL,
       ];
 
@@ -582,7 +575,7 @@ WHERE li.contribution_id = %1";
    *   [5] => ['price_field_id' => 5, 'price_field_value_id' => x, 'label....qty...unit_price...line_total...financial_type_id]
    *
    */
-  public static function buildLineItemsForSubmittedPriceField($priceParams, $overrideAmount = NULL, $financialTypeID = NULL) {
+  public static function buildLineItemsForSubmittedPriceField($priceParams, $overrideAmount = NULL, $financialTypeID = NULL): array {
     $lineItems = [];
     foreach ($priceParams as $key => $value) {
       $priceField = self::getPriceFieldMetaData($key);
@@ -618,7 +611,6 @@ WHERE li.contribution_id = %1";
    * @param int $entity
    * @param int $contributionId
    * @param $feeBlock
-   * @param array $lineItems
    *
    * @throws \CRM_Core_Exception
    */
@@ -627,10 +619,9 @@ WHERE li.contribution_id = %1";
     $entityID,
     $entity,
     $contributionId,
-    $feeBlock,
-    $lineItems
+    $feeBlock
   ) {
-    $entityTable = "civicrm_" . $entity;
+    $entityTable = 'civicrm_' . $entity;
     $newLineItems = [];
     CRM_Price_BAO_PriceSet::processAmount($feeBlock,
       $params, $newLineItems
@@ -812,7 +803,7 @@ WHERE li.contribution_id = %1";
 
   /**
    * Helper function to return sum of financial item's amount related to a line-item
-   * @param array $lineItemID
+   * @param int $lineItemID
    *
    * @return float $financialItem
    */
@@ -876,7 +867,7 @@ WHERE li.contribution_id = %1";
     foreach ($previousLineItems as $id => $previousLineItem) {
       if (in_array($previousLineItem['price_field_value_id'], $submittedPriceFieldValueIDs)) {
         $submittedLineItem = $submittedLineItems[$previousLineItem['price_field_value_id']];
-        if (CRM_Utils_Array::value('html_type', $lineItemsToAdd[$previousLineItem['price_field_value_id']]) == 'Text') {
+        if (($lineItemsToAdd[$previousLineItem['price_field_value_id']]['html_type'] ?? NULL) == 'Text') {
           // If a 'Text' price field was updated by changing qty value, then we are not adding new line-item but updating the existing one,
           //  because unlike other kind of price-field, it's related price-field-value-id isn't changed and thats why we need to make an
           //  exception here by adding financial item for updated line-item and will reverse any previous financial item entries.
@@ -1034,7 +1025,7 @@ WHERE li.contribution_id = %1";
         $line[$getUpdatedLineItemsDAO->price_field_value_id] = $getUpdatedLineItemsDAO->label . ' - ' . (float) $getUpdatedLineItemsDAO->qty;
       }
 
-      $partUpdateFeeAmt['fee_level'] = implode(', ', $line);
+      $partUpdateFeeAmt['fee_level'] = $line;
       $partUpdateFeeAmt['fee_amount'] = $inputParams['amount'];
       CRM_Event_BAO_Participant::add($partUpdateFeeAmt);
 
@@ -1258,7 +1249,7 @@ WHERE li.contribution_id = %1";
    * @return string
    */
   protected function getSalesTaxTerm() {
-    return CRM_Contribute_BAO_Contribution::checkContributeSettings('tax_term');
+    return \Civi::settings()->get('tax_term');
   }
 
   /**
@@ -1281,11 +1272,14 @@ WHERE li.contribution_id = %1";
    * clauses being added. Additional filters joining on the participant
    * and membership tables just seem too non-performant.
    *
+   * @param string|null $entityName
+   * @param int|null $userId
+   * @param array $conditions
    * @inheritDoc
    */
-  public function addSelectWhereClause(): array {
+  public function addSelectWhereClause(string $entityName = NULL, int $userId = NULL, array $conditions = []): array {
     $clauses['contribution_id'] = CRM_Utils_SQL::mergeSubquery('Contribution');
-    CRM_Utils_Hook::selectWhereClause($this, $clauses);
+    CRM_Utils_Hook::selectWhereClause($this, $clauses, $userId, $conditions);
     return $clauses;
   }
 

@@ -261,7 +261,7 @@ class CRM_Activity_Selector_Search extends CRM_Core_Selector_Base implements CRM
 
       $row['target_contact_name'] = CRM_Activity_BAO_ActivityContact::getNames($row['activity_id'], $targetID);
       $row['assignee_contact_name'] = CRM_Activity_BAO_ActivityContact::getNames($row['activity_id'], $assigneeID);
-      list($row['source_contact_name'], $row['source_contact_id']) = CRM_Activity_BAO_ActivityContact::getNames($row['activity_id'], $sourceID, TRUE);
+      [$row['source_contact_name'], $row['source_contact_id']] = CRM_Activity_BAO_ActivityContact::getNames($row['activity_id'], $sourceID, TRUE);
       $row['source_contact_name'] = implode(',', array_values($row['source_contact_name']));
       $row['source_contact_id'] = implode(',', $row['source_contact_id']);
 
@@ -319,7 +319,8 @@ class CRM_Activity_Selector_Search extends CRM_Core_Selector_Base implements CRM
       $row['campaign'] = $allCampaigns[$result->activity_campaign_id] ?? NULL;
       $row['campaign_id'] = $result->activity_campaign_id;
 
-      if ($engagementLevel = CRM_Utils_Array::value('activity_engagement_level', $row)) {
+      $engagementLevel = $row['activity_engagement_level'] ?? NULL;
+      if ($engagementLevel) {
         $row['activity_engagement_level'] = CRM_Utils_Array::value($engagementLevel,
           $engagementLevels, $engagementLevel
         );

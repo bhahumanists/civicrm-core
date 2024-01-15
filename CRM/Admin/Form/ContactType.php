@@ -32,7 +32,6 @@ class CRM_Admin_Form_ContactType extends CRM_Admin_Form {
    */
   public function buildQuickForm() {
     parent::buildQuickForm();
-    $this->setPageTitle(ts('Contact Type'));
 
     if ($this->_action & CRM_Core_Action::DELETE) {
       return;
@@ -142,7 +141,7 @@ class CRM_Admin_Form_ContactType extends CRM_Admin_Form {
       $params['image_URL'] = '';
     }
 
-    $contactType = CRM_Contact_BAO_ContactType::add($params);
+    $contactType = CRM_Contact_BAO_ContactType::writeRecord($params);
     CRM_Core_Session::setStatus(ts("The Contact Type '%1' has been saved.",
       [1 => $contactType->label]
     ), ts('Saved'), 'success');

@@ -43,14 +43,14 @@ class CRM_Core_BAO_Note extends CRM_Core_DAO_Note implements \Civi\Core\HookInte
   }
 
   /**
-   * Given a note id, decide if the note should be displayed based on privacy setting
+   * Given a note id, decide if the note should be hidden based on privacy setting
    *
    * @param object $note
    *   Either the id of the note to retrieve, or the CRM_Core_DAO_Note object itself.
    *
    * @return bool
-   *   TRUE if the note should be displayed, otherwise FALSE
-   *
+   *   TRUE if the note should be hidden, otherwise FALSE
+   * @deprecated in favor of selectWhereClause
    */
   public static function getNotePrivacyHidden($note) {
     if (CRM_Core_Permission::check('view all notes')) {
@@ -60,6 +60,9 @@ class CRM_Core_BAO_Note extends CRM_Core_DAO_Note implements \Civi\Core\HookInte
     $noteValues = [];
     if (is_object($note) && get_class($note) === 'CRM_Core_DAO_Note') {
       CRM_Core_DAO::storeValues($note, $noteValues);
+    }
+    elseif (is_array($note)) {
+      $noteValues = $note;
     }
     else {
       $noteDAO = new CRM_Core_DAO_Note();
@@ -167,20 +170,20 @@ class CRM_Core_BAO_Note extends CRM_Core_DAO_Note implements \Civi\Core\HookInte
 
       $recentOther = [];
       if ($noteActions) {
-        $recentOther = array(
-          'editUrl' => CRM_Utils_System::url('civicrm/contact/view/note',
-            "reset=1&action=update&cid={$note->entity_id}&id={$note->id}&context=home"
+        $recentOther = [
+          'editUrl' => CRM_Utils_System::url('civicrm/note',
+            "reset=1&action=update&id={$note->id}&context=home"
           ),
-          'deleteUrl' => CRM_Utils_System::url('civicrm/contact/view/note',
-            "reset=1&action=delete&cid={$note->entity_id}&id={$note->id}&context=home"
+          'deleteUrl' => CRM_Utils_System::url('civicrm/note',
+            "reset=1&action=delete&id={$note->id}&context=home"
           ),
-        );
+        ];
       }
 
       // add the recently created Note
       CRM_Utils_Recent::add($displayName . ' - ' . $note->subject,
-        CRM_Utils_System::url('civicrm/contact/view/note',
-          "reset=1&action=view&cid={$note->entity_id}&id={$note->id}&context=home"
+        CRM_Utils_System::url('civicrm/note',
+          "reset=1&action=view&id={$note->id}&context=home"
         ),
         $note->id,
         'Note',
@@ -327,7 +330,7 @@ class CRM_Core_BAO_Note extends CRM_Core_DAO_Note implements \Civi\Core\HookInte
      AND  entity_id = %1
      AND  note is not null
 ORDER BY  modified_date desc";
-    $params = array(1 => array($id, 'Integer'));
+    $params = [1 => [$id, 'Integer']];
 
     $dao = CRM_Core_DAO::executeQuery($query, $params);
 
@@ -373,7 +376,7 @@ ORDER BY  modified_date desc";
    *
    * @return array
    *   Nested associative array beginning with direct children of given note.
-   *
+   * @deprecated only called by deprecated APIv3
    */
   public static function getNoteTree($parentId, $maxDepth = 0, $snippet = FALSE) {
     return self::buildNoteTree($parentId, $maxDepth, $snippet);
@@ -419,6 +422,7 @@ ORDER BY  modified_date desc";
    *
    * @return array
    *   Nested associative array beginning with direct children of given note.
+   * @deprecated only called by deprecated APIv3
    */
   private static function buildNoteTree($parentId, $maxDepth = 0, $snippet = FALSE, &$tree = [], $depth = 0) {
     if ($maxDepth && $depth > $maxDepth) {
@@ -501,7 +505,7 @@ ORDER BY  modified_date desc";
    *   Contact id whose notes to be deleted.
    */
   public static function cleanContactNotes($contactID) {
-    $params = array(1 => array($contactID, 'Integer'));
+    $params = [1 => [$contactID, 'Integer']];
 
     // delete all notes related to contribution
     $contributeQuery = "DELETE note.*
@@ -524,6 +528,29 @@ WHERE participant.contact_id = %1 AND  note.entity_table = 'civicrm_participant'
     while ($contactNoteId->fetch()) {
       self::deleteRecord(['id' => $contactNoteId->id]);
     }
+  }
+
+  public function addSelectWhereClause(string $entityName = NULL, int $userId = NULL, array $conditions = []): array {
+    $clauses = [];
+    $relatedClauses = self::getDynamicFkAclClauses('entity_table', 'entity_id', $conditions['entity_table'] ?? NULL);
+    if ($relatedClauses) {
+      // Nested array will be joined with OR
+      $clauses['entity_table'] = [$relatedClauses];
+    }
+    // Enforce note privacy setting
+    if (!CRM_Core_Permission::check('view all notes', $userId)) {
+      // It was ok to have $userId = NULL for the permission check but must be an int for the query
+      $cid = $userId ?? (int) CRM_Core_Session::getLoggedInContactID();
+      $clauses['privacy'] = [
+        [
+          '= 0',
+          // OR
+          "= 1 AND {contact_id} = $cid",
+        ],
+      ];
+    }
+    CRM_Utils_Hook::selectWhereClause($this, $clauses, $userId, $conditions);
+    return $clauses;
   }
 
 }

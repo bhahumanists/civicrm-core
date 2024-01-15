@@ -8,7 +8,7 @@
  +--------------------------------------------------------------------+
 *}
 <p>
-{if $rows }
+{if $rows}
 <div class="form-item">
      <span class="element-right">{include file="CRM/common/formButtons.tpl" location="top"}</span>
 </div>
@@ -22,7 +22,7 @@
     <th>{ts}Member Since{/ts}</th>
     <th>{ts}Membership Start Date{/ts}</th>
     <th>{ts}Membership Expiration Date{/ts}</th>
-    <th>{ts}Source{/ts}</th>
+    <th>{ts}Membership Source{/ts}</th>
     <th>{ts}Status{/ts}</th>
   </tr>
 {foreach from=$rows item=row}

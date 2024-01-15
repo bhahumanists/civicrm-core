@@ -516,7 +516,7 @@ class CRM_Core_BAO_UFGroup extends CRM_Core_DAO_UFGroup implements \Civi\Core\Ho
         $formattedField['options_per_line'] = $customFields[$field->field_name]['options_per_line'];
         $formattedField['html_type'] = $customFields[$field->field_name]['html_type'];
 
-        if (CRM_Utils_Array::value('html_type', $formattedField) == 'Select Date') {
+        if (($formattedField['html_type'] ?? NULL) == 'Select Date') {
           $formattedField['date_format'] = $customFields[$field->field_name]['date_format'];
           $formattedField['time_format'] = $customFields[$field->field_name]['time_format'];
           $formattedField['is_datetime_field'] = TRUE;
@@ -716,30 +716,26 @@ class CRM_Core_BAO_UFGroup extends CRM_Core_DAO_UFGroup implements \Civi\Core\Ho
 
   /**
    * @param $ctype
-   * @param int|bool $checkPermission
-   * @return mixed
+   * @param int|null $checkPermission
+   * @return array
    */
   protected static function getCustomFields($ctype, $checkPermission = CRM_Core_Permission::VIEW) {
     // Only Edit and View is supported in ACL for custom field.
-    if ($checkPermission == CRM_Core_Permission::CREATE) {
+    if ($checkPermission && $checkPermission != CRM_Core_Permission::VIEW) {
       $checkPermission = CRM_Core_Permission::EDIT;
     }
-    // Make the cache user specific by adding the ID to the key.
-    $contactId = CRM_Core_Session::getLoggedInContactID();
-    $cacheKey = 'uf_group_custom_fields_' . $ctype . '_' . $contactId . '_' . (int) $checkPermission;
-    if (!Civi::cache('metadata')->has($cacheKey)) {
-      $customFields = CRM_Core_BAO_CustomField::getFieldsForImport($ctype, FALSE, FALSE, FALSE, $checkPermission, TRUE);
+    $customFields = CRM_Core_BAO_CustomField::getFieldsForImport($ctype, FALSE, FALSE, FALSE, $checkPermission, TRUE);
 
-      // hack to add custom data for components
-      $components = ['Contribution', 'Participant', 'Membership', 'Activity', 'Case'];
-      foreach ($components as $value) {
-        $customFields = array_merge($customFields, CRM_Core_BAO_CustomField::getFieldsForImport($value));
-      }
-      $addressCustomFields = CRM_Core_BAO_CustomField::getFieldsForImport('Address');
-      $customFields = array_merge($customFields, $addressCustomFields);
-      Civi::cache('metadata')->set($cacheKey, [$customFields, $addressCustomFields]);
+    // Fixme: why this hardcoded list? If we truly want all fields we should use CRM_Core_BAO_CustomGroup::getAll().
+    $components = ['Contribution', 'Participant', 'Membership', 'Activity', 'Case'];
+    foreach ($components as $value) {
+      $extraFields = CRM_Core_BAO_CustomField::getFieldsForImport($value, FALSE, FALSE, FALSE, $checkPermission);
+      $customFields = array_merge($customFields, $extraFields);
     }
-    return Civi::cache('metadata')->get($cacheKey);
+    $addressCustomFields = CRM_Core_BAO_CustomField::getFieldsForImport('Address', FALSE, FALSE, FALSE, $checkPermission);
+    $customFields = array_merge($customFields, $addressCustomFields);
+    // For some reason this function returns Address custom fields as a second item.
+    return [$customFields, $addressCustomFields];
   }
 
   /**
@@ -1286,7 +1282,7 @@ class CRM_Core_BAO_UFGroup extends CRM_Core_DAO_UFGroup implements \Civi\Core\Ho
         }
       }
 
-      if ((CRM_Utils_Array::value('visibility', $field) == 'Public Pages and Listings') &&
+      if ((($field['visibility'] ?? NULL) == 'Public Pages and Listings') &&
         CRM_Core_Permission::check('profile listings and forms')
       ) {
 
@@ -1458,28 +1454,7 @@ class CRM_Core_BAO_UFGroup extends CRM_Core_DAO_UFGroup implements \Civi\Core\Ho
       $params['group_type'] = implode(',', $params['group_type']);
     }
 
-    $hook = empty($params['id']) ? 'create' : 'edit';
-    CRM_Utils_Hook::pre($hook, 'UFGroup', ($params['id'] ?? NULL), $params);
-
-    $ufGroup = new CRM_Core_DAO_UFGroup();
-    $ufGroup->copyValues($params);
-
-    $ufGroupID = CRM_Utils_Array::value('ufgroup', $ids, CRM_Utils_Array::value('id', $params));
-    if (!$ufGroupID && empty($params['name'])) {
-      $ufGroup->name = CRM_Utils_String::munge($ufGroup->title, '_', 56);
-    }
-    $ufGroup->id = $ufGroupID;
-
-    $ufGroup->save();
-
-    if (!$ufGroupID && empty($params['name'])) {
-      $ufGroup->name = $ufGroup->name . "_{$ufGroup->id}";
-      $ufGroup->save();
-    }
-
-    CRM_Utils_Hook::post($hook, 'UFGroup', $ufGroup->id, $ufGroup);
-
-    return $ufGroup;
+    return self::writeRecord($params);
   }
 
   /**
@@ -1808,7 +1783,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
     $view = $field['is_view'];
     $required = ($mode == CRM_Profile_Form::MODE_SEARCH) ? FALSE : $field['is_required'];
     $search = $mode == CRM_Profile_Form::MODE_SEARCH;
-    $isShared = CRM_Utils_Array::value('is_shared', $field, 0);
+    $isShared = $field['is_shared'] ?? 0;
 
     // do not display view fields in drupal registration form
     // CRM-4632
@@ -1843,7 +1818,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
         CRM_Core_Action::DELETE => [
           'name' => ts('Delete Contact Image'),
           'url' => 'civicrm/contact/image',
-          'qs' => 'reset=1&id=%%id%%&gid=%%gid%%&action=delete',
+          'qs' => 'reset=1&id=%%id%%&gid=%%gid%%&action=delete&qfKey=%%key%%',
           'extra' => 'onclick = "' . htmlspecialchars("if (confirm($deleteExtra)) this.href+='&confirmed=1'; else return false;") . '"',
         ],
       ];
@@ -1852,6 +1827,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
         [
           'id' => $form->get('id'),
           'gid' => $form->get('gid'),
+          'key' => $form->controller->_key,
         ],
         ts('more'),
         FALSE,
@@ -1919,7 +1895,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
         }
       }
     }
-    elseif (CRM_Utils_Array::value('name', $field) == 'membership_type') {
+    elseif (($field['name'] ?? NULL) == 'membership_type') {
       [$orgInfo, $types] = CRM_Member_BAO_MembershipType::getMembershipTypeInfo();
       $sel = &$form->addElement('hierselect', $name, $title);
       $select = ['' => ts('- select membership type -')];
@@ -1937,7 +1913,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
       }
       $sel->setOptions([$orgInfo, $types]);
     }
-    elseif (CRM_Utils_Array::value('name', $field) == 'membership_status') {
+    elseif (($field['name'] ?? NULL) == 'membership_status') {
       $form->add('select', $name, $title,
         CRM_Member_PseudoConstant::membershipStatus(NULL, NULL, 'label'), $required
       );
@@ -1957,7 +1933,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
       ], $required);
     }
     elseif ($fieldName === 'contact_sub_type') {
-      $gId = $form->get('gid') ? $form->get('gid') : CRM_Utils_Array::value('group_id', $field);
+      $gId = $form->get('gid') ?:  $field['group_id'] ?? NULL;
       if ($usedFor == 'onbehalf') {
         $profileType = 'Organization';
       }
@@ -1991,7 +1967,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
     }
     elseif (in_array($fieldName, CRM_Contact_BAO_Contact::$_greetingTypes)) {
       // Get contact type for greeting selector
-      $gId = $form->get('gid') ?: CRM_Utils_Array::value('group_id', $field);
+      $gId = $form->get('gid') ?:  $field['group_id'] ?? NULL;
       $profileType = CRM_Core_BAO_UFField::getProfileType($gId, TRUE, FALSE, TRUE);
 
       if (!$profileType || in_array($profileType, ['Contact', 'Contribution', 'Participant', 'Membership'])) {
@@ -2198,7 +2174,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
       if (substr($fieldName, 0, 3) === 'is_' or substr($fieldName, 0, 7) === 'do_not_') {
         $form->add('advcheckbox', $name, $title, $attributes, $required);
       }
-      elseif (CRM_Utils_Array::value('html_type', $field) === 'Select Date') {
+      elseif (($field['html_type'] ?? NULL) === 'Select Date') {
         $extra = isset($field['datepicker']) ? $field['datepicker']['extra'] : CRM_Utils_Date::getDatePickerExtra($field);
         $attributes = isset($field['datepicker']) ? $field['datepicker']['attributes'] : CRM_Utils_Date::getDatePickerAttributes($field);
         $form->add('datepicker', $name, $title, $attributes, $required, $extra);
@@ -2520,7 +2496,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
    * Check whether a profile is valid combination of
    * required profile fields
    *
-   * @param array $ufId
+   * @param array $ufID
    *   Integer id of the profile.
    * @param array $required
    *   Array of fields those are required in the profile.
@@ -2528,17 +2504,17 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
    * @return array
    *   associative array of profiles
    */
-  public static function checkValidProfile($ufId, $required = NULL) {
+  public static function checkValidProfile($ufID, $required = NULL) {
     $validProfile = FALSE;
-    if (!$ufId) {
+    if (!$ufID) {
       return $validProfile;
     }
 
-    if (!CRM_Core_DAO::getFieldValue('CRM_Core_DAO_UFGroup', $ufId, 'is_active')) {
+    if (!CRM_Core_DAO::getFieldValue('CRM_Core_DAO_UFGroup', $ufID, 'is_active')) {
       return $validProfile;
     }
 
-    $profileFields = self::getFields($ufId, FALSE, CRM_Core_Action::VIEW, NULL,
+    $profileFields = self::getFields($ufID, FALSE, CRM_Core_Action::VIEW, NULL,
       NULL, FALSE, NULL, FALSE, NULL,
       CRM_Core_Permission::CREATE, NULL
     );
@@ -2648,7 +2624,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
       $params = [1 => [$copy->id, 'Integer']];
       CRM_Core_DAO::executeQuery($query, $params);
     }
-    CRM_Utils_Hook::copy('UFGroup', $copy);
+    CRM_Utils_Hook::copy('UFGroup', $copy, $id);
 
     return $copy;
   }
@@ -3208,7 +3184,7 @@ AND    ( entity_id IS NULL OR entity_id <= 0 )
                     $defaults['field'][$componentId][$name] = $customValue;
                     break;
                   }
-                  elseif (CRM_Utils_Array::value('data_type', $tree['fields'][$customFieldDetails[0]]) == 'Date') {
+                  elseif (($tree['fields'][$customFieldDetails[0]]['data_type'] ?? NULL) == 'Date') {
                     $skipValue = TRUE;
 
                     // CRM-6681, $default contains formatted date, time values.
