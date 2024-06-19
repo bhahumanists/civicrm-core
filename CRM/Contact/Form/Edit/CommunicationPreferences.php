@@ -42,6 +42,9 @@ class CRM_Contact_Form_Edit_CommunicationPreferences {
     $privacy = $commPreff = $commPreference = [];
     $privacyOptions = CRM_Core_SelectValues::privacy();
 
+    //HUK-59
+    $privacyOptions['do_not_email'] = 'Do not email (only use in extremis - ask if unsure)';
+
     // we add is_opt_out as a separate checkbox below for display and help purposes so remove it here
     unset($privacyOptions['is_opt_out']);
 
@@ -68,7 +71,7 @@ class CRM_Contact_Form_Edit_CommunicationPreferences {
     //using for display purpose.
     $form->assign('commPreference', $commPreference);
 
-    $form->addField('is_opt_out', ['entity' => 'contact', 'label' => ts('NO BULK EMAILS (User Opt Out)')]);
+    //$form->addField('is_opt_out', ['entity' => 'contact', 'label' => ts('NO BULK EMAILS (User Opt Out)')]);
 
     $form->addField('communication_style_id', ['entity' => 'contact', 'type' => 'RadioGroup']);
     //check contact type and build filter clause accordingly for greeting types, CRM-4575
