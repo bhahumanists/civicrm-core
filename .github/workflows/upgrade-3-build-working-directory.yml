@@ -68,7 +68,7 @@ jobs:
           cd ../civicrm-drupal
           git remote add upstream https://github.com/civicrm/civicrm-drupal.git
           git fetch upstream
-          git checkout 7.x.${{ github.event.inputs.upgrade-version }}
+          git checkout 7.x-${{ github.event.inputs.upgrade-version }}
           git push origin
           cd ../civicrm-drupal-8
           git remote add upstream https://github.com/civicrm/civicrm-drupal-8.git
@@ -83,7 +83,7 @@ jobs:
           cd ../civicrm-backdrop
           git remote add upstream https://github.com/civicrm/civicrm-backdrop.git
           git fetch upstream
-          git checkout 1.x.${{ github.event.inputs.upgrade-version }}
+          git checkout 1.x-${{ github.event.inputs.upgrade-version }}
           git push origin
 
       - name: Clone our buildkit repo
