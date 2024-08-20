@@ -36,6 +36,4 @@ jobs:
           git fetch
           git checkout ${{ github.event.inputs.previous-version }}
           git switch ${{ github.event.inputs.upgrade-version }}
-          git log --oneline --grep='^HUK-' ${{ github.event.inputs.previous-version }}
-          git log --oneline --grep='^HUK-' ${{ github.event.inputs.previous-version }} | awk '{print $1}'
-          git log --oneline --grep='^HUK-' ${{ github.event.inputs.previous-version }} | awk '{print $1}' | xargs -n 1 git cherry-pick
+          git log --oneline --grep="^HUK-" ${{ github.event.inputs.previous-version }} | awk '{print $1}' | xargs -n 1 git cherry-pick
