@@ -93,13 +93,7 @@ jobs:
         run: |
           cd civicrm-buildkit-docker
           docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src && git remote add humanistsuk https://github.com/bhahumanists/civicrm-core"
-          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/packages && git remote add humanistsuk https://github.com/bhahumanists/civicrm-packages"
-          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/WordPress && git remote add humanistsuk https://github.com/bhahumanists/civicrm-wordpress"
-          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/drupal && git remote add humanistsuk https://github.com/bhahumanists/civicrm-drupal"
-          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/drupal-8 && git remote add humanistsuk https://github.com/bhahumanists/civicrm-drupal-8"
-          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/joomla && git remote add humanistsuk https://github.com/bhahumanists/civicrm-joomla"
-          docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist/src/backdrop && git remote add humanistsuk https://github.com/bhahumanists/civicrm-backdrop"
-
+          
       - name: Pull our custom repos
         run: cd civicrm-buildkit-docker && docker compose exec -iu buildkit civicrm bash -c "cd /buildkit/build/dist && env GIT_REMOTE=humanistsuk cividist update"
 
