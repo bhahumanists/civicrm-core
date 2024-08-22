@@ -81,6 +81,8 @@ class GetFieldsTest extends Api4TestBase implements TransactionalInterface {
     $this->assertFalse($fields['id']['nullable']);
     $this->assertFalse($fields['id']['required']);
     $this->assertNull($fields['id']['default_value']);
+
+    $this->assertEquals(['import', 'export', 'duplicate_matching'], $fields['id']['usage']);
   }
 
   public function testComponentFields(): void {
@@ -244,6 +246,7 @@ class GetFieldsTest extends Api4TestBase implements TransactionalInterface {
   public function testDynamicFks(): void {
     $tagFields = EntityTag::getFields(FALSE)
       ->execute()->indexBy('name');
+    $this->assertEquals('Tag', $tagFields['tag_id']['fk_entity']);
     $this->assertEmpty($tagFields['entity_id']['fk_entity']);
     $this->assertEquals('Activity', $tagFields['entity_id']['dfk_entities']['civicrm_activity']);
     $this->assertEquals('entity_table', $tagFields['entity_id']['input_attrs']['control_field']);

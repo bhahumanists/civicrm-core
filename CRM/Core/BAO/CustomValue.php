@@ -194,7 +194,7 @@ class CRM_Core_BAO_CustomValue extends CRM_Core_DAO implements \Civi\Core\HookIn
    */
   public static function deleteCustomValue($customValueID, $customGroupID) {
     // first we need to find custom value table, from custom group ID
-    $tableName = CRM_Core_DAO::getFieldValue('CRM_Core_DAO_CustomGroup', $customGroupID, 'table_name');
+    $tableName = CRM_Core_BAO_CustomGroup::getGroup(['id' => $customGroupID])['table_name'];
 
     // Retrieve the $entityId so we can pass that to the hook.
     $entityID = (int) CRM_Core_DAO::singleValueQuery("SELECT entity_id FROM {$tableName} WHERE id = %1", [
@@ -219,7 +219,7 @@ class CRM_Core_BAO_CustomValue extends CRM_Core_DAO implements \Civi\Core\HookIn
    * @param array $conditions
    * @return array
    */
-  public function addSelectWhereClause(string $entityName = NULL, int $userId = NULL, array $conditions = []): array {
+  public function addSelectWhereClause(?string $entityName = NULL, ?int $userId = NULL, array $conditions = []): array {
     // Some legacy code omits $entityName, in which case fall-back on 'Contact' which until 2023
     // was the only type of entity that could be extended by multi-record custom groups.
     $groupName = \Civi\Api4\Utils\CoreUtil::getCustomGroupName((string) $entityName);

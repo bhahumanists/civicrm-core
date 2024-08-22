@@ -569,7 +569,7 @@ WHERE  id = %1";
    * @todo $priceSetID is a pseudoparam for permit override - we should stop passing it where we
    * don't specifically need it & find a better way where we do.
    */
-  public static function processAmount($fields, &$params, &$lineItem, $priceSetID = NULL) {
+  public static function processAmount($fields, &$params, &$lineItem = [], $priceSetID = NULL) {
     // using price set
     foreach ($fields as $id => $field) {
       if (empty($params["price_{$id}"]) ||
@@ -667,6 +667,7 @@ WHERE  id = %1";
         ->execute()->first();
       $data['fields'] = (array) PriceField::get(FALSE)
         ->addWhere('price_set_id', '=', $priceSetID)
+        ->addWhere('is_active', '=', TRUE)
         ->addSelect('*', 'visibility_id:name')
         ->addOrderBy('weight', 'ASC')
         ->execute()->indexBy('id');
@@ -681,6 +682,7 @@ WHERE  id = %1";
       }
       $options = PriceFieldValue::get(FALSE)
         ->addWhere('price_field_id', 'IN', array_keys($data['fields']))
+        ->addWhere('is_active', '=', TRUE)
         ->setSelect($select)
         ->addOrderBy('weight', 'ASC')
         ->execute();
@@ -709,6 +711,7 @@ WHERE  id = %1";
    * @deprecated since 5.68. Will be removed around 5.80.
    */
   public static function buildPriceSet(&$form, $component = NULL, $validFieldsOnly = TRUE) {
+    CRM_Core_Error::deprecatedWarning('internal function');
     $priceSetId = $form->get('priceSetId');
     if (!$priceSetId) {
       return;

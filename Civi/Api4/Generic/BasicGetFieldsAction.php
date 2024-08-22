@@ -316,6 +316,7 @@ class BasicGetFieldsAction extends BasicGetAction {
           'Date' => ts('Date'),
           'Float' => ts('Float'),
           'Integer' => ts('Integer'),
+          'Money' => ts('Money'),
           'String' => ts('String'),
           'Text' => ts('Text'),
           'Timestamp' => ts('Timestamp'),
@@ -377,6 +378,12 @@ class BasicGetFieldsAction extends BasicGetAction {
       [
         'name' => 'permission',
         'data_type' => 'Array',
+      ],
+      [
+        'name' => 'usage',
+        'data_type' => 'Array',
+        'description' => 'Contexts in which field is used.',
+        'default_value' => [],
       ],
       [
         'name' => 'output_formatters',

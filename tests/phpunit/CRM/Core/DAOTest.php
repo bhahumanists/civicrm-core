@@ -1,5 +1,8 @@
 <?php
 
+use Civi\Api4\CustomField;
+use Civi\Api4\CustomGroup;
+
 /**
  * Class CRM_Core_DAOTest
  * @group headless
@@ -7,6 +10,11 @@
 class CRM_Core_DAOTest extends CiviUnitTestCase {
 
   const ABORTED_SQL = "_aborted_sql_";
+
+  protected function tearDown(): void {
+    $this->quickCleanup([], TRUE);
+    parent::tearDown();
+  }
 
   public function testGetReferenceColumns(): void {
     // choose CRM_Core_DAO_Email as an arbitrary example
@@ -600,7 +608,7 @@ class CRM_Core_DAOTest extends CiviUnitTestCase {
     $dao = new CRM_Core_DAO_Cache();
     $fields = $dao->fields();
     $this->assertSame(CRM_Utils_Type::T_TIMESTAMP, $fields['expired_date']['type'], 'Oh somebody changed the type, so this test might not be testing the right type of timestamp anymore. Might need to change the test to have it use a different field.');
-    $this->assertFalse($fields['expired_date']['required'], 'Oh somebody changed the REQUIRED setting, so this test might not be testing the right type of timestamp anymore. Might need to change the test to have it use a different field.');
+    $this->assertFalse(!empty($fields['expired_date']['required']), 'Oh somebody changed the REQUIRED setting, so this test might not be testing the right type of timestamp anymore. Might need to change the test to have it use a different field.');
 
     $dao->group_name = 'mytest';
     $dao->path = 'mypath';
@@ -638,6 +646,51 @@ class CRM_Core_DAOTest extends CiviUnitTestCase {
     $onlyName = ['name' => $saved->name];
     $this->assertEquals($label, CRM_Contact_BAO_SavedSearch::fillValues($onlyId, ['label'])['label']);
     $this->assertEquals($label, CRM_Contact_BAO_SavedSearch::fillValues($onlyName, ['label'])['label']);
+  }
+
+  public function testGetReferencesToContactTable(): void {
+    $group1 = CustomGroup::create(FALSE)
+      ->setValues([
+        'name' => 'cg1',
+        'title' => 'Custom Group1',
+        'extends' => 'Group',
+      ])
+      ->execute()->single();
+    $group2 = CustomGroup::create(FALSE)
+      ->setValues([
+        'name' => 'cg2',
+        'title' => 'Custom Group2',
+        'extends' => 'Contact',
+      ])
+      ->execute()->single();
+
+    $sampleFieldData = [
+      ['custom_group_id' => $group1['id'], 'data_type' => 'ContactReference', 'label' => 'f1'],
+      ['custom_group_id' => $group1['id'], 'fk_entity' => 'Household', 'label' => 'f2'],
+      ['custom_group_id' => $group2['id'], 'fk_entity' => 'Individual', 'label' => 'f3'],
+      ['custom_group_id' => $group2['id'], 'fk_entity' => 'Contact', 'label' => 'f4'],
+      ['custom_group_id' => $group2['id'], 'fk_entity' => 'Activity', 'label' => 'f5'],
+    ];
+    $customField = CustomField::save(FALSE)
+      ->setRecords($sampleFieldData)
+      ->setDefaults(['html_type' => 'Text', 'data_type' => 'EntityReference'])
+      ->execute();
+
+    $expectedCidRefs = [
+      $group1['table_name'] => [
+        $customField[0]['column_name'],
+        $customField[1]['column_name'],
+      ],
+      $group2['table_name'] => [
+        'entity_id',
+        $customField[2]['column_name'],
+        $customField[3]['column_name'],
+      ],
+    ];
+    $cidRefs = CRM_Core_DAO::getReferencesToContactTable();
+    foreach ($expectedCidRefs as $table => $refs) {
+      $this->assertEquals($refs, $cidRefs[$table]);
+    }
   }
 
 }

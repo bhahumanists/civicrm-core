@@ -19,7 +19,7 @@ use Civi\Api4\LineItem;
  * @package CRM
  * @copyright CiviCRM LLC https://civicrm.org/licensing
  */
-class CRM_Contribute_BAO_ContributionRecur extends CRM_Contribute_DAO_ContributionRecur implements Civi\Test\HookInterface {
+class CRM_Contribute_BAO_ContributionRecur extends CRM_Contribute_DAO_ContributionRecur implements Civi\Core\HookInterface {
 
   /**
    * Create recurring contribution.
@@ -29,8 +29,12 @@ class CRM_Contribute_BAO_ContributionRecur extends CRM_Contribute_DAO_Contributi
    *
    * @return object
    *   activity contact object
+   *
+   * @deprecated since 5.76 will be removed around 5.90.
+   * Non-core users should all use the api.
    */
   public static function create(&$params) {
+    CRM_Core_Error::deprecatedFunctionWarning('writeRecord');
     return self::add($params);
   }
 
@@ -46,49 +50,31 @@ class CRM_Contribute_BAO_ContributionRecur extends CRM_Contribute_DAO_Contributi
    *
    * @return \CRM_Contribute_BAO_ContributionRecur
    * @throws \CRM_Core_Exception
-   * @todo move hook calls / extended logic to create - requires changing calls
-   *   to call create not add
+   * @deprecated since 5.76 will be removed around 5.96.
+   * Non-core users should all use the api. As of writing there
+   * are some core users.
    */
   public static function add(&$params) {
-    if (!empty($params['id'])) {
-      CRM_Utils_Hook::pre('edit', 'ContributionRecur', $params['id'], $params);
-    }
-    else {
-      CRM_Utils_Hook::pre('create', 'ContributionRecur', NULL, $params);
-    }
+    return self::writeRecord($params);
+  }
 
-    // make sure we're not creating a new recurring contribution with the same transaction ID
-    // or invoice ID as an existing recurring contribution
-    $duplicates = [];
-    if (self::checkDuplicate($params, $duplicates)) {
-      throw new CRM_Core_Exception('Found matching recurring contribution(s): ' . implode(', ', $duplicates));
+  /**
+   * Event fired before modifying an IM.
+   * @param \Civi\Core\Event\PreEvent $event
+   */
+  public static function self_hook_civicrm_pre(\Civi\Core\Event\PreEvent $event) {
+    if (in_array($event->action, ['create', 'edit'])) {
+      // make sure we're not creating a new recurring contribution with the same transaction ID
+      // or invoice ID as an existing recurring contribution
+      $duplicates = [];
+      if (self::checkDuplicate($event->params, $duplicates)) {
+        throw new CRM_Core_Exception('Found matching recurring contribution(s): ' . implode(', ', $duplicates));
+      }
+      if ($event->action === 'create' && empty($event->params['currency'])) {
+        // set currency for CRM-1496
+        $event->params['currency'] = \Civi::settings()->get('defaultCurrency');
+      }
     }
-
-    $recurring = new CRM_Contribute_BAO_ContributionRecur();
-    $recurring->copyValues($params);
-    $recurring->id = $params['id'] ?? NULL;
-
-    // set currency for CRM-1496
-    if (empty($params['id']) && !isset($recurring->currency)) {
-      $config = CRM_Core_Config::singleton();
-      $recurring->currency = $config->defaultCurrency;
-    }
-    $recurring->save();
-
-    if (!empty($params['id'])) {
-      CRM_Utils_Hook::post('edit', 'ContributionRecur', $recurring->id, $recurring);
-    }
-    else {
-      CRM_Utils_Hook::post('create', 'ContributionRecur', $recurring->id, $recurring);
-    }
-
-    if (!empty($params['custom']) &&
-      is_array($params['custom'])
-    ) {
-      CRM_Core_BAO_CustomValueTable::store($params['custom'], 'civicrm_contribution_recur', $recurring->id);
-    }
-
-    return $recurring;
   }
 
   /**
@@ -333,12 +319,11 @@ class CRM_Contribute_BAO_ContributionRecur extends CRM_Contribute_DAO_Contributi
   }
 
   /**
-   * @param int $entityID
-   * @param string $entity
+   * @param int $recurringContributionID
    *
    * @return null|Object
    */
-  public static function getSubscriptionDetails($entityID, $entity = 'recur') {
+  public static function getSubscriptionDetails($recurringContributionID) {
     // Note: processor_id used to be aliased as subscription_id so we include it here
     // both as processor_id and subscription_id for legacy compatibility.
     $sql = "
@@ -360,35 +345,13 @@ SELECT rec.id                   as recur_id,
        con.id as contribution_id,
        con.contribution_page_id,
        rec.contact_id,
-       mp.membership_id";
-
-    if ($entity == 'recur') {
-      // This should be always true now.
-      $sql .= "
+       mp.membership_id
       FROM civicrm_contribution_recur rec
 LEFT JOIN civicrm_contribution       con ON ( con.contribution_recur_id = rec.id )
 LEFT  JOIN civicrm_membership_payment mp  ON ( mp.contribution_id = con.id )
      WHERE rec.id = %1";
-    }
-    elseif ($entity == 'contribution') {
-      CRM_Core_Error::deprecatedWarning('no longer used');
-      $sql .= "
-      FROM civicrm_contribution       con
-INNER JOIN civicrm_contribution_recur rec ON ( con.contribution_recur_id = rec.id )
-LEFT  JOIN civicrm_membership_payment mp  ON ( mp.contribution_id = con.id )
-     WHERE con.id = %1";
-    }
-    elseif ($entity == 'membership') {
-      CRM_Core_Error::deprecatedWarning('no longer used');
-      $sql .= "
-      FROM civicrm_membership_payment mp
-INNER JOIN civicrm_membership         mem ON ( mp.membership_id = mem.id )
-INNER JOIN civicrm_contribution_recur rec ON ( mem.contribution_recur_id = rec.id )
-INNER JOIN civicrm_contribution       con ON ( con.id = mp.contribution_id )
-     WHERE mp.membership_id = %1";
-    }
 
-    $dao = CRM_Core_DAO::executeQuery($sql, [1 => [$entityID, 'Integer']]);
+    $dao = CRM_Core_DAO::executeQuery($sql, [1 => [$recurringContributionID, 'Integer']]);
     if ($dao->fetch()) {
       return $dao;
     }
@@ -449,7 +412,7 @@ INNER JOIN civicrm_contribution       con ON ( con.id = mp.contribution_id )
 
     // Retrieve the most recently added contribution
     $mostRecentContribution = Contribution::get(FALSE)
-      ->addSelect('custom.*', 'id', 'contact_id', 'campaign_id', 'financial_type_id', 'currency', 'source', 'amount_level', 'address_id', 'on_behalf', 'source_contact_id', 'tax_amount', 'contribution_page_id', 'total_amount', 'is_test')
+      ->addSelect('custom.*', 'id', 'contact_id', 'campaign_id', 'financial_type_id', 'payment_instrument_id', 'currency', 'source', 'amount_level', 'address_id', 'on_behalf', 'source_contact_id', 'tax_amount', 'contribution_page_id', 'total_amount', 'is_test')
       ->addWhere('contribution_recur_id', '=', $id)
       ->addWhere('is_template', '=', 0)
       // we need this line otherwise the is test contribution don't work.
@@ -671,8 +634,7 @@ INNER JOIN civicrm_contribution       con ON ( con.id = mp.contribution_id )
       }
 
       // copy custom data
-      $extends = ['Contribution'];
-      $groupTree = CRM_Core_BAO_CustomGroup::getGroupDetail(NULL, NULL, $extends);
+      $groupTree = CRM_Core_BAO_CustomGroup::getAll(['extends' => ['Contribution']]);
       if ($groupTree) {
         foreach ($groupTree as $groupID => $group) {
           $table[$groupTree[$groupID]['table_name']] = ['entity_id'];
@@ -919,38 +881,33 @@ INNER JOIN civicrm_contribution       con ON ( con.id = mp.contribution_id )
    *
    * @throws \CRM_Core_Exception
    */
-  public static function updateOnNewPayment($recurringContributionID, $paymentStatus, string $effectiveDate = 'now') {
-
+  public static function updateOnNewPayment($recurringContributionID, string $paymentStatus, string $effectiveDate = 'now') {
     if (!in_array($paymentStatus, ['Completed', 'Failed'])) {
       return;
     }
-    $params = [
-      'id' => $recurringContributionID,
-      'return' => [
-        'contribution_status_id',
-        'next_sched_contribution_date',
-        'frequency_unit',
-        'frequency_interval',
-        'installments',
-        'failure_count',
-      ],
-    ];
 
-    $existing = civicrm_api3('ContributionRecur', 'getsingle', $params);
+    $existingRecur = \Civi\Api4\ContributionRecur::get(FALSE)
+      ->addSelect('contribution_status_id:name', 'next_sched_contribution_date', 'frequency_unit', 'frequency_interval', 'installments', 'failure_count')
+      ->addWhere('id', '=', $recurringContributionID)
+      ->execute()
+      ->first();
 
-    if ($paymentStatus == 'Completed'
-      && CRM_Contribute_PseudoConstant::contributionStatus($existing['contribution_status_id'], 'name') == 'Pending') {
-      $params['contribution_status_id'] = 'In Progress';
+    $updatedRecurParams['id'] = $recurringContributionID;
+    if (($paymentStatus === 'Completed')
+      && ($existingRecur['contribution_status_id:name'] === 'Pending')) {
+      // Update Recur to "In Progress"
+      $updatedRecurParams['contribution_status_id'] = CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_ContributionRecur', 'contribution_status_id', 'In Progress');
     }
     if ($paymentStatus == 'Failed') {
-      $params['failure_count'] = $existing['failure_count'];
+      $updatedRecurParams['failure_count'] = $existingRecur['failure_count'];
     }
-    $params['modified_date'] = date('Y-m-d H:i:s');
+    $updatedRecurParams['modified_date'] = date('Y-m-d H:i:s');
 
-    if (!empty($existing['installments']) && self::isComplete($recurringContributionID, $existing['installments'])) {
-      $params['contribution_status_id'] = 'Completed';
-      $params['next_sched_contribution_date'] = 'null';
-      $params['end_date'] = 'now';
+    if (!empty($existingRecur['installments']) && self::isComplete($recurringContributionID, $existingRecur['installments'])) {
+      // Update Recur to "Completed"
+      $updatedRecurParams['contribution_status_id'] = CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_ContributionRecur', 'contribution_status_id', 'Completed');
+      $updatedRecurParams['next_sched_contribution_date'] = 'null';
+      $updatedRecurParams['end_date'] = 'now';
     }
     else {
       // Only update next sched date if it's empty or up to 48 hours away because payment processors may be managing
@@ -960,12 +917,12 @@ INNER JOIN civicrm_contribution       con ON ( con.id = mp.contribution_id )
       // Note 48 hours is a bit aribtrary but means that we can hopefully ignore the time being potentially
       // rounded down to midnight.
       $upperDateToConsiderProcessed = strtotime('+ 48 hours', ($effectiveDate ? strtotime($effectiveDate) : time()));
-      if (empty($existing['next_sched_contribution_date']) || strtotime($existing['next_sched_contribution_date']) <=
+      if (empty($existingRecur['next_sched_contribution_date']) || strtotime($existingRecur['next_sched_contribution_date']) <=
         $upperDateToConsiderProcessed) {
-        $params['next_sched_contribution_date'] = date('Y-m-d', strtotime('+' . $existing['frequency_interval'] . ' ' . $existing['frequency_unit'], strtotime($effectiveDate)));
+        $updatedRecurParams['next_sched_contribution_date'] = date('Y-m-d', strtotime('+' . $existingRecur['frequency_interval'] . ' ' . $existingRecur['frequency_unit'], strtotime($effectiveDate)));
       }
     }
-    civicrm_api3('ContributionRecur', 'create', $params);
+    civicrm_api3('ContributionRecur', 'create', $updatedRecurParams);
   }
 
   /**

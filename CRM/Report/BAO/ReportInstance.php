@@ -29,6 +29,11 @@ class CRM_Report_BAO_ReportInstance extends CRM_Report_DAO_ReportInstance implem
       return NULL;
     }
 
+    if (empty($params['grouprole'])) {
+      // an empty array is getting stored as '' but it needs to be null
+      $params['grouprole'] = NULL;
+    }
+
     if (!isset($params['id'])) {
       $params['domain_id'] ??= CRM_Core_Config::domainID();
       // CRM-17256 set created_id on report creation.
@@ -285,7 +290,7 @@ class CRM_Report_BAO_ReportInstance extends CRM_Report_DAO_ReportInstance implem
    *
    * @inheritDoc
    */
-  public function addSelectWhereClause(string $entityName = NULL, int $userId = NULL, array $conditions = []): array {
+  public function addSelectWhereClause(?string $entityName = NULL, ?int $userId = NULL, array $conditions = []): array {
     $permissions = CRM_Core_DAO::executeQuery('SELECT DISTINCT permission FROM civicrm_report_instance');
     $validPermissions = [];
     while ($permissions->fetch()) {

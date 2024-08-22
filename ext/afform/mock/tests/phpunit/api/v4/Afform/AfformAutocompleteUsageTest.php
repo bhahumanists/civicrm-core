@@ -16,6 +16,13 @@ use Civi\Api4\SavedSearch;
  */
 class AfformAutocompleteUsageTest extends AfformUsageTestCase {
 
+  public function tearDown(): void {
+    CustomGroup::delete(FALSE)
+      ->addWhere('id', '>', 0)
+      ->execute();
+    parent::tearDown();
+  }
+
   /**
    * Ensure that Afform restricts autocomplete results when it's set to use a SavedSearch
    */
@@ -65,7 +72,7 @@ EOHTML;
     $contacts = Contact::save(FALSE)
       ->setRecords($sampleContacts)
       ->addDefault('last_name', $lastName)
-      ->execute()->indexBy('first_name')->column('id');
+      ->execute()->column('id', 'first_name');
 
     $result = Contact::autocomplete()
       ->setFormName('afform:' . $this->formName)
@@ -129,7 +136,7 @@ EOHTML;
 
     $contacts = Contact::save(FALSE)
       ->setRecords($sampleData)
-      ->execute()->indexBy('first_name')->column('id');
+      ->execute()->column('id', 'first_name');
 
     // Place contacts A & B in the group, but not contact C
     $group = Group::create(FALSE)
@@ -228,7 +235,7 @@ EOHTML;
 
     $contacts = Contact::save(FALSE)
       ->setRecords($sampleData)
-      ->execute()->indexBy('first_name')->column('id');
+      ->execute()->column('id', 'first_name');
 
     CustomGroup::create(FALSE)
       ->addValue('title', 'test_address_fields')

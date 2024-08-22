@@ -11,6 +11,7 @@
 use Civi\Api4\Activity;
 use Civi\Api4\Contribution;
 use Civi\Api4\CustomField;
+use Civi\Api4\EntityFinancialTrxn;
 use Civi\Api4\FinancialTrxn;
 use Civi\Api4\PledgePayment;
 use Civi\Api4\Product;
@@ -231,27 +232,6 @@ class CRM_Contribute_BAO_ContributionTest extends CiviUnitTestCase {
 
     // Run it to make sure it's not bad sql.
     CRM_Core_DAO::executeQuery($sql);
-  }
-
-  /**
-   * Test the annual query returns a correct result when multiple line items
-   * are present.
-   *
-   * @throws \Civi\Core\Exception\DBQueryException
-   */
-  public function testAnnualWithMultipleLineItems(): void {
-    $contactID = $this->createLoggedInUserWithFinancialACL();
-    $this->createContributionWithTwoLineItemsAgainstPriceSet([
-      'contact_id' => $contactID,
-    ]
-    );
-    $this->enableFinancialACLs();
-    $sql = CRM_Contribute_BAO_Contribution::getAnnualQuery([$contactID]);
-    $result = CRM_Core_DAO::executeQuery($sql);
-    $result->fetch();
-    $this->assertEquals(300, $result->amount);
-    $this->assertEquals(1, $result->count);
-    $this->disableFinancialACLs();
   }
 
   /**
@@ -928,6 +908,8 @@ WHERE eft.entity_id = %1 AND ft.to_financial_account_id <> %2";
    * We pay $50, resulting in it being allocated as $45.45 payment & $4.55 tax. This is in equivalent proportions
    * to the original payment - ie. .0909 of the $110 is 10 & that * 50 is $4.54 (note the rounding seems wrong as it should be
    * saved un-rounded).
+   *
+   * @throws \CRM_Core_Exception
    */
   public function testCreateProportionalFinancialEntriesViaPaymentCreate(): void {
     [$contribution, $financialAccount] = $this->createContributionWithTax([], FALSE);
@@ -941,16 +923,14 @@ WHERE eft.entity_id = %1 AND ft.to_financial_account_id <> %2";
       'contribution_id' => $contribution['id'],
     ];
     $financialTrxn = $this->callAPISuccess('Payment', 'create', $params);
-    $eftParams = [
-      'entity_table' => 'civicrm_financial_item',
-      'financial_trxn_id' => $financialTrxn['id'],
-    ];
-    $entityFinancialTrxn = $this->callAPISuccess('EntityFinancialTrxn', 'Get', $eftParams);
-    $this->assertEquals(2, $entityFinancialTrxn['count'], 'Invalid count.');
-    $testAmount = [4.55, 45.45];
-    foreach ($entityFinancialTrxn['values'] as $value) {
-      $this->assertEquals(array_pop($testAmount), $value['amount'], 'Invalid amount stored in civicrm_entity_financial_trxn.');
-    }
+
+    $entityFinancialTrxns = EntityFinancialTrxn::get(FALSE)
+      ->addWhere('entity_table', '=', 'civicrm_financial_item')
+      ->addWhere('financial_trxn_id', '=', $financialTrxn['id'])
+      ->addOrderBy('amount')->execute();
+    $this->assertCount(2, $entityFinancialTrxns, '2 EntityFinancialTrxns should be created (one for tax).');
+    $this->assertEquals(4.55, $entityFinancialTrxns->first()['amount'], 'Incorrect tax amount in entity financial trxn');
+    $this->assertEquals(45.45, $entityFinancialTrxns->last()['amount'], 'Incorrect tax exclusive amount in entity financial trxn');
   }
 
   /**

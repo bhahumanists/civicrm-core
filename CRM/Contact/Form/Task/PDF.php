@@ -105,6 +105,17 @@ class CRM_Contact_Form_Task_PDF extends CRM_Contact_Form_Task {
   }
 
   /**
+   * {@inheritDoc}
+   */
+  protected function getFieldsToExcludeFromPurification(): array {
+    return [
+      'details',
+      'activity_details',
+      'html_message',
+    ];
+  }
+
+  /**
    * Build the form object.
    *
    * @throws \CRM_Core_Exception
@@ -143,7 +154,7 @@ class CRM_Contact_Form_Task_PDF extends CRM_Contact_Form_Task {
   protected function getRows(): array {
     $rows = [];
     foreach ($this->_contactIds as $index => $contactID) {
-      $caseID = $this->getVar('_caseId');
+      $caseID = $this->_caseId;
       if (empty($caseID) && !empty($this->_caseIds[$index])) {
         $caseID = $this->_caseIds[$index];
       }

@@ -17,11 +17,8 @@
         ctrl = this,
         // Prefix used for SearchKit explicit joins
         namePrefix = '',
-        boolOptions = [{id: true, label: ts('Yes')}, {id: false, label: ts('No')}],
-        // Used to store chain select options loaded on-the-fly
-        chainSelectOptions = null,
-        // Only used for is_primary radio button
-        noOptions = [{id: true, label: ''}];
+        // Either defn.options or chain select options loaded on-the-fly
+        fieldOptions = null;
 
       // Attributes for each of the low & high date fields when using search_range
       this.inputAttrs = [];
@@ -41,13 +38,20 @@
           this.search_operator = this.defn.search_operator;
         }
 
+        fieldOptions = this.defn.options || null;
+
         // Ensure boolean options are truly boolean
-        if (this.defn.data_type === 'Boolean' && this.defn.options) {
-          this.defn.options.forEach((option) => option.id = !!option.id);
+        if (this.defn.data_type === 'Boolean') {
+          if (fieldOptions) {
+            fieldOptions.forEach((option) => option.id = !!option.id);
+          } else {
+            fieldOptions = [{id: true, label: ts('Yes')}, {id: false, label: ts('No')}];
+          }
         }
 
         // is_primary field - watch others in this afRepeat block to ensure only one is selected
         if (ctrl.fieldName === 'is_primary' && 'repeatIndex' in $scope.dataProvider) {
+          fieldOptions = [{id: true, label: ''}];
           $scope.$watch('dataProvider.afRepeat.getEntityController().getData()', function (items, prev) {
             var index = $scope.dataProvider.repeatIndex;
             // Set first item to primary if there isn't a primary
@@ -91,11 +95,11 @@
               crmApi4('Afform', 'getOptions', params)
                 .then(function(data) {
                   $('input[crm-ui-select]', $element).removeClass('loading').prop('disabled', !data.length);
-                  chainSelectOptions = data;
+                  fieldOptions = data;
                   validateValue();
                 });
             } else {
-              chainSelectOptions = null;
+              fieldOptions = null;
               validateValue();
             }
           }, true);
@@ -123,10 +127,6 @@
           else if (ctrl.afFieldset.getStoredValue(ctrl.fieldName) !== undefined) {
             setValue(ctrl.afFieldset.getStoredValue(ctrl.fieldName));
           }
-          else if ('default_date_type' in ctrl.defn && ctrl.defn.default_date_type === 'now') {
-            let currentDate = new Date();
-            setValue(currentDate.toISOString().split('T')[0]);
-          }
           // Set default value based on field defn
           else if ('afform_default' in ctrl.defn) {
             setValue(ctrl.defn.afform_default);
@@ -153,6 +153,13 @@
           }
         });
       };
+
+      // When this field is removed by afIf, also remove its value from the data model.
+      $scope.$on('afIfDestroy', function() {
+        if (ctrl.defn.input_type !== 'DisplayOnly') {
+          delete $scope.dataProvider.getFieldData()[ctrl.fieldName];
+        }
+      });
 
       // correct the type for the value, make sure numbers are numbers and not string
       function correctValueType(value, dataType) {
@@ -185,9 +192,18 @@
 
       // Set default value; ensure data type matches input type
       function setValue(value) {
+        // For values passed from the url, split
+        if (typeof value === 'string' && ctrl.isMultiple()) {
+          value = value.split(',');
+        }
         // correct the value type
-        value = correctValueType(value, ctrl.defn.data_type);
+        if (ctrl.defn.input_type !== 'DisplayOnly') {
+          value = correctValueType(value, ctrl.defn.data_type);
+        }
 
+        if (ctrl.defn.input_type === 'Date' && typeof value === 'string' && value.startsWith('now')) {
+          value = getRelativeDate(value);
+        }
         if (ctrl.defn.input_type === 'Number' && ctrl.defn.search_range) {
           if (!_.isPlainObject(value)) {
             value = {
@@ -207,9 +223,6 @@
             '>=': ('' + value).split('-')[0],
             '<=': ('' + value).split('-')[1] || '',
           };
-        }
-        else if (_.isString(value) && ctrl.isMultiple()) {
-          value = value.split(',');
         }
         $scope.getSetValue(value);
       }
@@ -238,10 +251,12 @@
       // ngChange callback from Existing entity field
       ctrl.onSelectEntity = function() {
         if (ctrl.defn.input_attrs && ctrl.defn.input_attrs.autofill) {
-          var val = $scope.getSetSelect();
-          var entity = ctrl.afFieldset.modelName;
-          var index = ctrl.getEntityIndex();
-          ctrl.afFieldset.afFormCtrl.loadData(entity, index, val, ctrl.defn.name);
+          const val = $scope.getSetSelect();
+          const entity = ctrl.afFieldset.modelName;
+          const entityIndex = ctrl.getEntityIndex();
+          const joinEntity = ctrl.afJoin ? ctrl.afJoin.entity : null;
+          const joinIndex = ctrl.afJoin && $scope.dataProvider.repeatIndex || 0;
+          ctrl.afFieldset.afFormCtrl.loadData(entity, entityIndex, val, ctrl.defn.name, joinEntity, joinIndex);
         }
       };
 
@@ -256,12 +271,22 @@
         };
       };
 
-      ctrl.getAutocompleteFieldName = function() {
-        return ctrl.afFieldset.modelName + (ctrl.afJoin ? ('+' + ctrl.afJoin.entity) : '') + ':' + ctrl.fieldName;
+      ctrl.getAutocompleteParams = function() {
+        let fieldName = ctrl.afFieldset.getName();
+        // Append join name which will be unpacked by AfformAutocompleteSubscriber::processAfformAutocomplete
+        if (ctrl.afJoin) {
+          fieldName += '+' + ctrl.afJoin.entity;
+        }
+        fieldName += ':' + ctrl.fieldName;
+        return {
+          formName: 'afform:' + ctrl.afFieldset.getFormName(),
+          fieldName: fieldName,
+          values: $scope.dataProvider.getFieldData()
+        };
       };
 
       $scope.getOptions = function () {
-        return chainSelectOptions || ctrl.defn.options || (ctrl.fieldName === 'is_primary' && ctrl.defn.input_type === 'Radio' ? noOptions : boolOptions);
+        return fieldOptions;
       };
 
       $scope.select2Options = function() {
@@ -342,6 +367,24 @@
         }
         return currentVal;
       };
+
+      function getRelativeDate(dateString) {
+        const parts = dateString.split(' ');
+        const baseDate = new Date();
+        let unit = parts[2] || 'day';
+        let offset = parseInt(parts[1] || '0', 10);
+
+        switch (unit) {
+          case 'week':
+            offset *= 7;
+            break;
+
+          case 'year':
+            offset *= 365;
+        }
+        let newDate = new Date(baseDate.getTime() + offset * 24 * 60 * 60 * 1000);
+        return newDate.toISOString().split('T')[0];
+      }
 
     }
   });

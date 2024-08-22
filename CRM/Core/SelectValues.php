@@ -369,8 +369,8 @@ class CRM_Core_SelectValues {
   public static function ufVisibility() {
     return [
       'User and User Admin Only' => ts('User and User Admin Only'),
-      'Public Pages' => ts('Expose Publicly'),
-      'Public Pages and Listings' => ts('Expose Publicly and for Listings'),
+      'Public Pages' => ts('Public Pages'),
+      'Public Pages and Listings' => ts('Public Pages and Listings'),
     ];
   }
 
@@ -494,7 +494,7 @@ class CRM_Core_SelectValues {
   }
 
   public static function smsProvider(): array {
-    $providers = CRM_SMS_BAO_Provider::getProviders(NULL, NULL, TRUE, 'is_default desc, title');
+    $providers = CRM_SMS_BAO_SmsProvider::getProviders(NULL, NULL, TRUE, 'is_default desc, title');
     $result = [];
     foreach ($providers as $provider) {
       $result[] = [
@@ -774,6 +774,7 @@ class CRM_Core_SelectValues {
     return [
       'Admin' => ts('Admin'),
       'Email' => ts('Email'),
+      'Form' => ts('Form'),
       'Web' => ts('Web'),
       'API' => ts('API'),
     ];
@@ -919,6 +920,7 @@ class CRM_Core_SelectValues {
    */
   public static function getMailingJobStatus() {
     return [
+      'Draft' => ts('Draft'),
       'Scheduled' => ts('Scheduled'),
       'Running' => ts('Running'),
       'Complete' => ts('Complete'),
@@ -1118,7 +1120,7 @@ class CRM_Core_SelectValues {
   }
 
   public static function getQuicksearchOptions(): array {
-    $includeEmail = civicrm_api3('setting', 'getvalue', ['name' => 'includeEmailInName', 'group' => 'Search Preferences']);
+    $includeEmail = Civi::settings()->get('includeEmailInName');
     $options = [
       [
         'key' => 'sort_name',
@@ -1174,27 +1176,18 @@ class CRM_Core_SelectValues {
         'label' => ts('Job Title'),
       ],
     ];
-    $custom = civicrm_api4('CustomField', 'get', [
-      'checkPermissions' => FALSE,
-      'select' => ['id', 'name', 'label', 'custom_group_id.name', 'custom_group_id.title', 'option_group_id'],
-      'where' => [
-        ['custom_group_id.extends', 'IN', array_merge(['Contact'], CRM_Contact_BAO_ContactType::basicTypes())],
-        ['data_type', 'NOT IN', ['ContactReference', 'Date', 'File']],
-        ['custom_group_id.is_active', '=', TRUE],
-        ['is_active', '=', TRUE],
-        ['is_searchable', '=', TRUE],
-      ],
-      'orderBy' => [
-        'custom_group_id.weight' => 'ASC',
-        'weight' => 'ASC',
-      ],
-    ]);
-    foreach ($custom as $field) {
-      $options[] = [
-        'key' => $field['custom_group_id.name'] . '.' . $field['name'] . ($field['option_group_id'] ? ':label' : ''),
-        'label' => $field['custom_group_id.title'] . ': ' . $field['label'],
-        'adv_search_legacy' => 'custom_' . $field['id'],
-      ];
+    $customGroups = CRM_Core_BAO_CustomGroup::getAll(['extends' => 'Contact', 'is_active' => TRUE], CRM_Core_Permission::VIEW);
+    foreach ($customGroups as $group) {
+      foreach ($group['fields'] as $field) {
+        if (in_array($field['data_type'], ['Date', 'File', 'ContactReference', 'EntityReference'])) {
+          continue;
+        }
+        $options[] = [
+          'key' => $group['name'] . '.' . $field['name'] . ($field['option_group_id'] ? ':label' : ''),
+          'label' => $group['title'] . ': ' . $field['label'],
+          'adv_search_legacy' => 'custom_' . $field['id'],
+        ];
+      }
     }
     return $options;
   }
@@ -1312,6 +1305,20 @@ class CRM_Core_SelectValues {
       }
     }
     return $options;
+  }
+
+  /**
+   * @return array
+   *   Array(string $machineName => string $label).
+   */
+  public static function getPDFLoggingOptions() {
+    return [
+      'none' => ts('Do not record'),
+      'multiple' => ts('Multiple activities (one per contact)'),
+      'combined' => ts('One combined activity'),
+      'combined-attached' => ts('One combined activity plus one file attachment'),
+      // 'multiple-attached' <== not worth the work
+    ];
   }
 
 }

@@ -173,7 +173,7 @@
       {if $action eq 4}
         {include file="CRM/Custom/Page/CustomDataView.tpl"}
       {else}
-        {include file="CRM/common/customDataBlock.tpl"}
+        {include file="CRM/common/customDataBlock.tpl" groupID='' customDataType='Activity'}
       {/if}
     </td>
   </tr>
@@ -208,7 +208,7 @@
             $('.crm-accordion-body', $form).each( function() {
               //open tab if form rule throws error
               if ( $(this).children( ).find('span.crm-error').text( ).length > 0 ) {
-                $(this).parent('.collapsed').crmAccordionToggle();
+                $(this).parent('details').prop('open', true);
               }
             });
             function toggleMultiActivityCheckbox() {
@@ -243,13 +243,13 @@
       <a href="{crmURL p='civicrm/activity/add' q=$urlParams}" class="edit button" title="{ts}Edit{/ts}"><span><i class="crm-i fa-pencil" aria-hidden="true"></i> {ts}Edit{/ts}</span></a>
     {/if}
 
-    {if call_user_func(array('CRM_Core_Permission','check'), 'delete activities')}
+    {crmPermission has='delete activities'}
       {assign var='urlParams' value="reset=1&atype=$atype&action=delete&reset=1&id=$entityID&cid=$contactId&context=$context"}
       {if ($context eq 'fulltext' || $context eq 'search') && $searchKey}
         {assign var='urlParams' value="reset=1&atype=$atype&action=delete&reset=1&id=$entityID&cid=$contactId&context=$context&key=$searchKey"}
       {/if}
       <a href="{crmURL p='civicrm/contact/view/activity' q=$urlParams}" class="delete button" title="{ts}Delete{/ts}"><span><i class="crm-i fa-trash" aria-hidden="true"></i> {ts}Delete{/ts}</span></a>
-    {/if}
+    {/crmPermission}
   {/if}
   {if $action eq 4 and $context != 'case' and call_user_func(array('CRM_Case_BAO_Case','checkPermission'), $activityId, 'File On Case', $atype)}
     <a href="#" onclick="fileOnCase('file', {$activityId}, null, this); return false;" class="cancel button" title="{ts}File On Case{/ts}"><span><i class="crm-i fa-clipboard" aria-hidden="true"></i> {ts}File on Case{/ts}</span></a>

@@ -189,7 +189,7 @@ trait DAOActionTrait {
    *
    * @param array $record
    */
-  private function resolveFKValues(array &$record): void {
+  protected function resolveFKValues(array &$record): void {
     // Resolve domain id first
     uksort($record, function($a, $b) {
       return substr($a, 0, 9) == 'domain_id' ? -1 : 1;
@@ -257,14 +257,14 @@ trait DAOActionTrait {
         $value = '';
       }
 
-      if ($field['html_type'] === 'CheckBox') {
-        // this function should be part of a class
-        formatCheckBoxField($value, 'custom_' . $field['id'], $this->getEntityName());
+      // Uglify checkbox values for the sake of CustomField::formatCustomField()
+      if ($field['html_type'] === 'CheckBox' && is_array($value)) {
+        $value = array_fill_keys($value, TRUE);
       }
 
       // Match contact id to strings like "user_contact_id"
       // FIXME handle arrays for multi-value contact reference fields, etc.
-      if ($field['data_type'] === 'ContactReference' && is_string($value) && !is_numeric($value)) {
+      if (in_array($field['data_type'], ['ContactReference', 'EntityReference']) && is_string($value) && !is_numeric($value)) {
         // FIXME decouple from v3 API
         require_once 'api/v3/utils.php';
         $value = \_civicrm_api3_resolve_contactID($value);

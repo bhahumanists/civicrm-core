@@ -13,13 +13,14 @@
 {capture assign=tdStyle}style="width: 100px;"{/capture}
 {capture assign=participantTotalStyle}style="margin: 0.5em 0 0.5em;padding: 0.5em;background-color: #999999;font-weight: bold;color: #FAFAFA;border-radius: 2px;"{/capture}
 
-<table id="crm-event_receipt" style="font-family: Arial, Verdana, sans-serif; text-align: left; width:100%; max-width:700px; padding:0; margin:0; border:0px;">
-
   <!-- BEGIN HEADER -->
-  <!-- You can add table row(s) here with logo or other header elements -->
+    {* To modify content in this section, you can edit the Custom Token named "Message Header". See also: https://docs.civicrm.org/user/en/latest/email/message-templates/#modifying-system-workflow-message-templates *}
+    {site.message_header}
   <!-- END HEADER -->
 
   <!-- BEGIN CONTENT -->
+
+  <table id="crm-event_receipt" style="font-family: Arial, Verdana, sans-serif; text-align: left; width:100%; max-width:700px; padding:0; margin:0; border:0px;">
   <tr>
     <td>
       {assign var="greeting" value="{contact.email_greeting_display}"}{if $greeting}<p>{$greeting},</p>{/if}
@@ -27,9 +28,9 @@
         <p>{event.confirm_email_text}</p>
       {else}
         <p>{ts}Thank you for your registration.{/ts}
-            {if $participant_status}{ts 1=$participant_status}This is a confirmation that your registration has been received and your status has been updated to<strong> %1</strong>.{/ts}
+            {if $participant_status}{ts 1=$participant_status}This is a confirmation that your registration has been received and your status has been updated to <strong>%1</strong>.{/ts}
             {else}
-              {if $isOnWaitlist}{ts}This is a confirmation that your registration has been received and your status has been updated to<strong>waitlisted</strong>.{/ts}
+              {if $isOnWaitlist}{ts}This is a confirmation that your registration has been received and your status has been updated to <strong>waitlisted</strong>.{/ts}
               {else}{ts}This is a confirmation that your registration has been received and your status has been updated to <strong>registered<strong>.{/ts}
               {/if}
             {/if}
@@ -65,17 +66,6 @@
             {event.start_date|crmDate:"%A"} {event.start_date|crmDate}{if {event.end_date|boolean}}-{if '{event.end_date|crmDate:"%Y%m%d"}' === '{event.start_date|crmDate:"%Y%m%d"}'}{event.end_date|crmDate:"Time"}{else}{event.end_date|crmDate:"%A"} {event.end_date|crmDate}{/if}{/if}
           </td>
         </tr>
-
-        {if "{participant.role_id:label}" neq 'Attendee'}
-          <tr>
-            <td {$labelStyle}>
-              {ts}Participant Role{/ts}
-            </td>
-            <td {$valueStyle}>
-              {participant.role_id:label}
-            </td>
-          </tr>
-        {/if}
 
         {if {event.is_show_location|boolean}}
           <tr>
@@ -349,7 +339,7 @@
                     {ts}Transaction #{/ts}
                   </td>
                   <td {$valueStyle}>
-                    {contribution.trxn_id|boolean}
+                    {contribution.trxn_id}
                   </td>
                 </tr>
               {/if}
@@ -461,8 +451,8 @@
       {if {event.allow_selfcancelxfer|boolean}}
         <tr>
           <td colspan="2" {$valueStyle}>
-            {capture assign=selfservice_preposition}{if {event.selfcancelxfer_time} > 0}{ts}before{/ts}{else}{ts}after{/ts}{/if}{/capture}
-            {ts 1={event.selfcancelxfer_time} 2=$selfservice_preposition}You may transfer your registration to another participant or cancel your registration up to %1 hours %2 the event.{/ts}
+            {capture assign=selfservice_preposition}{if {event.selfcancelxfer_time|boolean} && {event.selfcancelxfer_time} > 0}{ts}before{/ts}{else}{ts}after{/ts}{/if}{/capture}
+            {ts 1="{event.selfcancelxfer_time}" 2="$selfservice_preposition"}You may transfer your registration to another participant or cancel your registration up to %1 hours %2 the event.{/ts}
             {if {contribution.paid_amount|boolean}}{ts}Cancellations are not refundable.{/ts}{/if}<br/>
             {capture assign=selfService}{crmURL p='civicrm/event/selfsvcupdate' q="reset=1&pid={participant.id}&{contact.checksum}"  h=0 a=1 fe=1}{/capture}
             <a href="{$selfService}">{ts}Click here to transfer or cancel your registration.{/ts}</a>

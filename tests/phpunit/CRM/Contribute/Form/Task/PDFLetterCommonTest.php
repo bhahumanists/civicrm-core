@@ -499,10 +499,8 @@ emo
     $this->assertEquals(2, $activities['count']);
     $this->assertEquals($html[1], $activities['values'][0]['details']);
     $this->assertEquals($html[2], $activities['values'][1]['details']);
-    // Checking it is not called multiple times.
-    // once for each contact create + once for the activities.
-    // By calling the cached function we can get this down to 1
-    $this->assertEquals(3, $this->hookTokensCalled);
+    // Checking the cacheable hook is not called multiple times.
+    $this->assertEquals(1, $this->hookTokensCalled);
     $mailUtil->checkAllMailLog($html);
 
   }
@@ -570,8 +568,7 @@ value=$contact_aggregate+$contribution.total_amount}
   public function hook_aggregateTokenValues(array &$values, $contactIDs, $job = NULL, $tokens = [], $context = NULL) {
     foreach ($contactIDs as $contactID) {
       CRM_Core_Smarty::singleton()->assign('messageContactID', $contactID);
-      $values[$contactID]['aggregate.rendered_token'] = CRM_Core_Smarty::singleton()
-        ->fetch('string:' . $this->getHtmlMessage());
+      $values[$contactID]['aggregate.rendered_token'] = CRM_Utils_String::parseOneOffStringThroughSmarty($this->getHtmlMessage());
     }
   }
 

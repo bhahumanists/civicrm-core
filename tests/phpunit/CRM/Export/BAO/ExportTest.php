@@ -184,7 +184,7 @@ class CRM_Export_BAO_ExportTest extends CiviUnitTestCase {
       'componentClause' => 'civicrm_contribution.id IN ( ' . implode(',', $this->contributionIDs) . ')',
     ]);
 
-    $this->assertEquals(array_merge($this->getBasicHeaderDefinition(FALSE), $this->getContributeHeaderDefinition()), $this->csv->getHeader());
+    $this->assertEquals(array_values(array_merge($this->getBasicHeaderDefinition(FALSE), $this->getContributeHeaderDefinition())), $this->csv->getHeader());
     $this->assertCount(3, $this->csv);
     $row = $this->csv->fetchOne();
     $this->assertEquals(95, $row['Net Amount']);
@@ -1184,7 +1184,6 @@ class CRM_Export_BAO_ExportTest extends CiviUnitTestCase {
         'addressee' => '2',
         'addressee_other' => 'random string {contact.display_name}',
         'mergeOption' => '1',
-        'additional_group' => '',
         'mapping' => '',
       ],
     ]);
@@ -1856,7 +1855,7 @@ class CRM_Export_BAO_ExportTest extends CiviUnitTestCase {
     $this->setupBaseExportData($exportMode);
     $this->doExportTest(['selectAll' => TRUE, 'exportMode' => $exportMode, 'ids' => [1]]);
     $this->assertEquals($expected, $this->processor->getSQLColumns());
-    $this->assertEquals($expectedHeaders, $this->processor->getHeaderRows());
+    $this->assertEquals(array_values($expectedHeaders), $this->processor->getHeaderRows());
   }
 
   /**

@@ -345,15 +345,28 @@ Czech Republic
    */
   public function testLocationTokens(): void {
     $contactID = $this->individualCreate(['email' => 'me@example.com']);
-    Address::create()->setValues([
+    $this->createTestEntity('Address', [
       'contact_id' => $contactID,
       'is_primary' => TRUE,
       'street_address' => 'Heartbreak Hotel',
       'supplemental_address_1' => 'Lonely Street',
-    ])->execute();
-    $text = '{contact.first_name} {contact.email_primary.email} {contact.address_primary.street_address}';
-    $text = $this->renderText(['contactId' => $contactID], $text);
-    $this->assertEquals('Anthony me@example.com Heartbreak Hotel', $text);
+      'state_province_id:name' => 'New York',
+    ], 'primary');
+
+    $this->createTestEntity('Address', [
+      'contact_id' => $contactID,
+      'is_billing' => TRUE,
+      'street_address' => 'Heartbreak Motel',
+      'supplemental_address_1' => 'Lonely Avenue',
+      'country_id:name' => 'United States',
+      'state_province_id:name' => 'California',
+    ], 'billing');
+    $template = '{contact.first_name} {contact.email_primary.email} {contact.address_primary.street_address} {contact.address_billing.supplemental_address_1} {contact.address_billing.state_province_id:abbr}';
+    $text = $this->renderText(['contactId' => $contactID], $template);
+    $this->assertEquals('Anthony me@example.com Heartbreak Hotel Lonely Avenue CA', $text);
+    Address::delete()->addWhere('id', '=', $this->ids['Address']['billing'])->execute();
+    $text = $this->renderText(['contactId' => $contactID], $template);
+    $this->assertEquals('Anthony me@example.com Heartbreak Hotel Lonely Street NY', $text);
   }
 
   /**
@@ -939,6 +952,7 @@ United States', $tokenProcessor->getRow(0)->render('message'));
       '{domain.state_province_id:label}' => 'Domain (Organization) State',
       '{domain.country_id:label}' => 'Domain (Organization) Country',
       '{domain.empowered_by_civicrm_image_url}' => 'Empowered By CiviCRM Image',
+      '{site.message_header}' => 'Message Header',
     ];
   }
 
@@ -1138,7 +1152,7 @@ United States', $tokenProcessor->getRow(0)->render('message'));
       'event_id' => $this->ids['Event'][0],
       'fee_amount' => 50,
       'fee_level' => 'steep',
-      $this->getCustomFieldName('participant_int') => '99999',
+      $this->getCustomFieldName('participant_int', 4) => '99999',
     ]);
   }
 
@@ -1180,7 +1194,7 @@ Attendees will need to install the [TeleFoo](http://telefoo.example.com) app.';
    *
    * @return \Civi\Token\TokenProcessor
    */
-  protected function getTokenProcessor(array $override): TokenProcessor {
+  protected function getTokenProcessor(array $override = []): TokenProcessor {
     return new TokenProcessor(\Civi::dispatcher(), array_merge([
       'controller' => __CLASS__,
     ], $override));
@@ -1206,6 +1220,23 @@ Attendees will need to install the [TeleFoo](http://telefoo.example.com) app.';
     $tokenProcessor->addMessage('text', $text, 'text/' . ($isHtml ? 'html' : 'plain'));
     $tokenProcessor->evaluate();
     return $tokenProcessor->getRow(0)->render('text');
+  }
+
+  public function testQuotedTokens(): void {
+    $quoteOptions = [
+      '"',
+      '&lquote;',
+      '&rquote;',
+      '&quot;',
+      '&#8221;',
+      '&#8220;',
+      '&#x22;',
+    ];
+    Civi::settings()->set('dateformatFull', '%B %E%f, %Y');
+    foreach ($quoteOptions as $quote) {
+      $date = CRM_Utils_Date::customFormat(date('Y-m-d H:i:s'), '%B %E%f, %Y');
+      $this->assertEquals($date, $this->renderText([], '{domain.now|crmDate:' . $quote . 'Full' . $quote . '}'), 'render with quote type :' . $quote);
+    }
   }
 
 }

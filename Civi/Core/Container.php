@@ -188,8 +188,7 @@ class Container {
     foreach ($basicCaches as $cacheSvc => $cacheGrp) {
       $definitionParams = [
         'name' => $cacheGrp . (in_array($cacheGrp, $verSuffixCaches) ? $verSuffix : ''),
-        // FIXME: Uncommenting below causes test failure
-        // 'service' => $cacheSvc,
+        'service' => $cacheSvc,
         'type' => ['*memory*', 'SqlGroup', 'ArrayCache'],
       ];
       // For Caches that we don't really care about the ttl for and/or maybe accessed
@@ -240,15 +239,6 @@ class Container {
 
     $container->setDefinition('pear_mail', new Definition('Mail'))
       ->setFactory('CRM_Utils_Mail::createMailer')->setPublic(TRUE);
-
-    $container->setDefinition('crypto.registry', new Definition('Civi\Crypto\CryptoRegistry'))
-      ->setFactory('Civi\Crypto\CryptoRegistry::createDefaultRegistry')->setPublic(TRUE);
-
-    $container->setDefinition('crypto.token', new Definition('Civi\Crypto\CryptoToken', []))
-      ->setPublic(TRUE);
-
-    $container->setDefinition('crypto.jwt', new Definition('Civi\Crypto\CryptoJwt', []))
-      ->setPublic(TRUE);
 
     $bootServiceTypes = [
       'cache.settings' => \CRM_Utils_Cache_Interface::class,
@@ -355,6 +345,7 @@ class Container {
       'Civi\Token\TokenCompatSubscriber',
       []
     ))->addTag('kernel.event_subscriber')->setPublic(TRUE);
+
     $container->setDefinition("crm_mailing_action_tokens", new Definition(
       'CRM_Mailing_ActionTokens',
       []
@@ -399,6 +390,16 @@ class Container {
       'CRM_Core_DomainTokens',
       []
     ))->addTag('kernel.event_subscriber')->setPublic(TRUE);
+
+    // For each DAO that supports tokens by declaring the token class...
+    $entities = \CRM_Core_DAO_AllCoreTables::tokenClasses();
+    foreach ($entities as $entity => $class) {
+      $container->setDefinition('crm_entity_token_' . strtolower($entity), new Definition(
+        $class,
+        [$entity]
+      ))->addTag('kernel.event_subscriber')->setPublic(TRUE);
+    }
+
     $container->setDefinition('crm_token_tidy', new Definition(
       '\Civi\Token\TidySubscriber',
       []

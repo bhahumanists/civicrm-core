@@ -1,6 +1,7 @@
 *~
 *.bak
 .use-civicrm-setup
+.composer-downloads
 /ext/*
 !/ext/afform
 !/ext/standaloneusers
@@ -22,6 +23,8 @@
 !/ext/financialacls
 !/ext/contributioncancelactions
 !/ext/recaptcha
+!/ext/iframe
+!/ext/oembed
 !/ext/payflowpro
 !/ext/ckeditor4
 !/ext/legacycustomsearches
@@ -36,6 +39,7 @@
 !/ext/civi_report
 !/ext/scheduled_communications
 !/ext/user_dashboard
+!/ext/tellafriend
 backdrop/
 bower_components
 CRM/Case/xml/configuration

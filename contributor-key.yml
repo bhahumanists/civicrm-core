@@ -100,6 +100,9 @@
   name        : Anthony Nemirovsky
   organization: Giant Rabbit
 
+- github      : angelajackson07
+  name        : Angela Jackson
+
 - github      : amsharma9
   name        : Amal Sharma
   organization: Abhikalak Consultants
@@ -162,7 +165,9 @@
 - github      : AsylumSeekersCentre
   name        : Asylum Seekers Centre
 
-- github      : avall-llovera
+- github      : avallllovera
+  name        : Albert Vall-Llovera
+  organization: iXiam
 
 - github      : artfulrobot
   name        : Rich Lott
@@ -330,6 +335,10 @@
   name        : Chandana Bandara
   organization: CompuCorp
 
+- github      : crusonweb
+  name        : Dan Cruson
+  organization: CrusonWeb
+
 - github      : CsarRamos
   name        : César Ramos
   organization: iXiam
@@ -354,6 +363,10 @@
 
 - github      : davejenx
   name        : Dave Jenkins
+  organization: Circle Interactive
+
+- github      : angelajackson07
+  name        : Angela Jackson
   organization: Circle Interactive
 
 - github      : davialexandre
@@ -397,6 +410,8 @@
 - github      : devarun
   name        : Arun Singh
 
+- github      : devdavc
+
 - github      : adam-devapp
   name        : Adam Kwiatkowski
   organization: DevApp
@@ -423,6 +438,9 @@
 - github      : dwoods-encircle
   organization: enCircle Solutions Ltd.
   name        : Darren Woods
+
+- github      : eightiesguy
+  name        : Jonny Toomey
 
 - github      : Erioldoesdesign
   organization: Third Sector Design
@@ -543,6 +561,9 @@
 
 - github      : francescbassas
   name        : Francesc Bassas i Bullich
+
+- github      : franslyml
+  name        : Fransly
 
 - github      : freeform-sg
   organization: Freeform Solutions
@@ -738,6 +759,9 @@
   name        : Josh Corlew
   organization: AGH Strategies
 
+- github      : JamesBugden314
+  name        : James Bugden
+
 - name        : Jane Hanley
   organization: AGH Strategies
 
@@ -828,6 +852,10 @@
 
 - github      : jptillman
 
+- github      : JSProffitt
+  name        : Jeremy Proffitt
+  organization: Ezodesign
+
 - name        : Julian Libor
 
 - name        : Julie Hall
@@ -836,6 +864,10 @@
 - github      : jusfreeman
   name        : Justin Freeman
   organization: Agileware
+
+- github      : justinmosier
+  name        : Justin Mosier
+  organization: Mosier Consulting
 
 - github      : jvos
 
@@ -846,6 +878,10 @@
 - github      : Kajakaran
   name        : Kajakaran Balakrishnan
   organization: Veda Consulting
+
+- github      : kapn1966
+  name        : Keith Nunn
+  organization: kapn*net Technology Services
 
 - github      : kartik1000
   name        : Kartik Kathuria
@@ -900,6 +936,10 @@
 - github      : kurund
   name        : Kurund Jalmi
   organization: Third Sector Design
+
+- github      : kzalewski
+  name        : Ken Zalewski
+  organization: New York State Senate
 
 - github      : lalgwebdev
   name        : Tony Maynard-Smith
@@ -988,6 +1028,10 @@
   organization: Formatux
 
 - name        : Manish Zope
+
+- github      : MarcMichalsky
+  name        : Marc Michalsky
+  organization: forumZFD
 
 - github      : mariav0
   name        : Maria Vogel
@@ -1154,6 +1198,9 @@
 - github      : muniodiego
   name        : Diego Muñio
 
+- github      : munkeywolf00
+  name        : David Cativo
+
 - github      : mwestergaard
   name        : Mark Westergaard
   organization: iXiam
@@ -1202,14 +1249,18 @@
 - github      : olivierh65
   name        : Olivier Hertrich
 
+- github      : omarlopesino
+  name        : Omar Mohamad
+  organization: MetaDrop
+
 - github      : otetard
   name        : Olivier Tétard
 
 - github      : nowszy
   name        : Pawel Nowak
 
-- github       : pboling
-  name         : Peter Boling
+- github      : pboling
+  name        : Peter Boling
 
 - name        : Peter Bull
 
@@ -1226,6 +1277,10 @@
 
 - github      : pnbpss
   name        : Panu Boonpromsook
+
+- github      : pokhiii
+  name        : Abhishek Pokhriyal
+  organization: ColoredCow
 
 - name        : Pratiksha Dubey
   organization: Web Access
@@ -1260,6 +1315,10 @@
 
 - name        : Patrick Corbett
   organization: Redfin Solutions
+
+- github      : patricklam
+  name        : Patrick Lam
+  organization: University of Waterloo
 
 - name        : Paul Barmak
 
@@ -1529,7 +1588,7 @@
 - name        : Bashar Makhay
 
 - github      : technomaz
-  name        : Mark 
+  name        : Mark
 
 - github      : TomRosenbloom
   name        : Tom Rosenbloom
@@ -1748,7 +1807,7 @@
 
 - github      : jofranz
   name        : Johannes Franz
-  organization: SYSTOPIA
+  organization: Systopia
 
 - github      : mikeybeck
   name        : Mike Beck
@@ -1757,3 +1816,29 @@
 - github      : ziljah
 
 - github      : 19ATF72
+
+- github      : yogesh-compuco
+  name        : Yogesh Pawar
+  organization: Compuco
+
+- github      : devdavc
+  name        : David Cativo
+  organization: DevApp
+
+- github      : eightiesguy
+  name        : Jonny Toomey
+
+- github      : IProSoft
+  name        : Artur Śmigielski
+
+- github      : vurt2
+  name        : Martin Correll
+  organization: civiservice.de
+
+- github      : gngn23
+  name        : Gerhard Weber
+  organization: civiservice.de
+
+- github      : jsuchogorska
+  name        : Joanna Suchogórska
+  organization: Future Processing

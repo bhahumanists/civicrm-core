@@ -1,6 +1,7 @@
 <?php
 use CRM_Standaloneusers_ExtensionUtil as E;
 use Civi\Api4\MessageTemplate;
+use Civi\Api4\Navigation;
 
 /**
  * Collection of upgrade steps.
@@ -16,7 +17,7 @@ class CRM_Standaloneusers_Upgrader extends CRM_Extension_Upgrader_Base {
    * @return void
    * @throws \CRM_Core_Exception
    */
-  public function onInstall() {
+  public function preInstall() {
     $config = \CRM_Core_Config::singleton();
     // We generally only want to run on standalone. In theory, we might also run headless tests.
     if (!in_array(get_class($config->userPermissionClass), ['CRM_Core_Permission_Standalone', 'CRM_Core_Permission_Headless'])) {
@@ -25,7 +26,7 @@ class CRM_Standaloneusers_Upgrader extends CRM_Extension_Upgrader_Base {
     if (!in_array(get_class($config->userSystem), ['CRM_Utils_System_Standalone', 'CRM_Utils_System_Headless'])) {
       throw new \CRM_Core_Exception("standaloneusers can only be installed on standalone");
     }
-    parent::onInstall();
+    CRM_Core_DAO::executeQuery('DROP TABLE civicrm_uf_match');
   }
 
   /**
@@ -99,18 +100,28 @@ class CRM_Standaloneusers_Upgrader extends CRM_Extension_Upgrader_Base {
   // }
 
   /**
-   * Example: Run a simple query when a module is enabled.
+   * On enable:
+   * - disable the user sync menu item
    */
-  // public function enable() {
-  //  CRM_Core_DAO::executeQuery('UPDATE foo SET is_active = 1 WHERE bar = "whiz"');
-  // }
+  public function enable() {
+    // standaloneusers is incompatible with user sync, so disable this nav menu item
+    Navigation::update(FALSE)
+      ->addWhere('url', '=', 'civicrm/admin/synchUser?reset=1')
+      ->addValue('is_active', FALSE)
+      ->execute();
+  }
 
   /**
-   * Example: Run a simple query when a module is disabled.
+   * On disable:
+   * - re-enable the user sync menu item
    */
-  // public function disable() {
-  //   CRM_Core_DAO::executeQuery('UPDATE foo SET is_active = 0 WHERE bar = "whiz"');
-  // }
+  public function disable() {
+    // reinstate user sync menu item
+    Navigation::update(FALSE)
+      ->addWhere('url', '=', 'civicrm/admin/synchUser?reset=1')
+      ->addValue('is_active', TRUE)
+      ->execute();
+  }
 
   /**
    * Example: Run a couple simple queries.

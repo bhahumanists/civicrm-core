@@ -20,7 +20,7 @@ class SpecFormatter {
   /**
    * Convert array from BAO::fields() or CustomGroup::getAll() into a FieldSpec object
    */
-  public static function arrayToField(array $data, string $entityName, array $customGroup = NULL): FieldSpec {
+  public static function arrayToField(array $data, string $entityName, ?array $customGroup = NULL): FieldSpec {
     $dataTypeName = self::getDataType($data);
 
     $hasDefault = isset($data['default']) && $data['default'] !== '';
@@ -33,8 +33,8 @@ class SpecFormatter {
       else {
         // Fields belonging to custom entities are treated as normal; type = Field instead of Custom
         $field->setType('Field');
-        $field->setTableName($customGroup['table_name']);
       }
+      $field->setTableName($customGroup['table_name']);
       if ($dataTypeName === 'EntityReference') {
         $field->setFkEntity($data['fk_entity']);
       }
@@ -55,6 +55,11 @@ class SpecFormatter {
         $field->setSuffixes($suffixes);
       }
       $field->setReadonly($data['is_view']);
+      $usage = ['export', 'duplicate_matching', 'token'];
+      if (empty($data['is_view'])) {
+        $usage[] = 'import';
+      }
+      $field->setUsage($usage);
     }
     // Core field
     else {
@@ -63,9 +68,9 @@ class SpecFormatter {
       $field->setType('Field');
       $field->setColumnName($name);
       $field->setNullable(empty($data['required']));
-      $field->setRequired(!empty($data['required']) && !$hasDefault && $name !== 'id');
+      $field->setRequired(!empty($data['required']) && !$hasDefault && empty($data['primary_key']));
       $field->setTitle($data['title'] ?? NULL);
-      $field->setLabel($data['html']['label'] ?? NULL);
+      $field->setLabel($data['input_attrs']['label'] ?? NULL);
       $field->setLocalizable($data['localizable'] ?? FALSE);
       if (!empty($data['DFKEntities'])) {
         $field->setDfkEntities($data['DFKEntities']);
@@ -82,19 +87,22 @@ class SpecFormatter {
         else {
           // These suffixes are always supported if a field has options
           $suffixes = ['name', 'label'];
-          // Add other columns specified in schema (e.g. 'abbrColumn')
+          // Add other columns specified in schema (e.g. 'abbr_column')
           foreach (array_diff(FormattingUtil::$pseudoConstantSuffixes, $suffixes) as $suffix) {
-            if (!empty($data['pseudoconstant'][$suffix . 'Column'])) {
+            if (!empty($data['pseudoconstant'][$suffix . '_column'])) {
               $suffixes[] = $suffix;
             }
           }
-          if (!empty($data['pseudoconstant']['optionGroupName'])) {
-            $suffixes = CoreUtil::getOptionValueFields($data['pseudoconstant']['optionGroupName'], 'name');
+          if (!empty($data['pseudoconstant']['option_group_name'])) {
+            $suffixes = CoreUtil::getOptionValueFields($data['pseudoconstant']['option_group_name'], 'name');
           }
         }
         $field->setSuffixes($suffixes);
       }
       $field->setReadonly(!empty($data['readonly']));
+      if (isset($data['usage'])) {
+        $field->setUsage($data['usage']);
+      }
     }
     if ($hasDefault) {
       $field->setDefaultValue(FormattingUtil::convertDataType($data['default'], $dataTypeName));
@@ -105,13 +113,12 @@ class SpecFormatter {
     self::setInputTypeAndAttrs($field, $data, $dataTypeName);
 
     $field->setPermission($data['permission'] ?? NULL);
-    $fkAPIName = $data['FKApiName'] ?? NULL;
-    $fkClassName = $data['FKClassName'] ?? NULL;
-    if ($fkAPIName || $fkClassName) {
-      $field->setFkEntity($fkAPIName ?: CoreUtil::getApiNameFromBAO($fkClassName));
+    $fkAPIName = $data['FKApiName'] ?? $data['entity_reference']['entity'] ?? NULL;
+    if ($fkAPIName) {
+      $field->setFkEntity($fkAPIName);
     }
     // For pseudo-fk fields like `civicrm_group.parents`
-    elseif (($data['html']['type'] ?? NULL) === 'EntityRef' && !empty($data['pseudoconstant']['table'])) {
+    elseif (($data['input_type'] ?? NULL) === 'EntityRef' && !empty($data['pseudoconstant']['table'])) {
       $field->setFkEntity(CoreUtil::getApiNameFromTableName($data['pseudoconstant']['table']));
     }
     if (!empty($data['FKColumnName'])) {
@@ -130,12 +137,12 @@ class SpecFormatter {
    * @return string
    */
   private static function getDataType(array $data) {
-    $dataType = $data['data_type'] ?? $data['dataType'] ?? NULL;
+    $dataType = $data['data_type'] ?? NULL;
     if (isset($dataType)) {
       return !empty($data['time_format']) ? 'Timestamp' : $dataType;
     }
 
-    $dataTypeInt = $data['type'] ?? NULL;
+    $dataTypeInt = \CRM_Utils_Schema::getCrmTypeFromSqlType($data['sql_type']);
     $dataTypeName = \CRM_Utils_Type::typeToString($dataTypeInt);
 
     return $dataTypeName === 'Int' ? 'Integer' : $dataTypeName;
@@ -144,37 +151,37 @@ class SpecFormatter {
   /**
    * Callback function to build option lists for all DAO & custom fields.
    *
-   * @param FieldSpec $spec
+   * @param array $field
    * @param array $values
    * @param bool|array $returnFormat
    * @param bool $checkPermissions
    * @return array|false
    */
-  public static function getOptions($spec, $values, $returnFormat, $checkPermissions) {
-    $fieldName = $spec->getName();
+  public static function getOptions($field, $values, $returnFormat, $checkPermissions) {
+    $fieldName = $field['name'];
 
-    if ($spec instanceof CustomFieldSpec) {
+    if (!empty($field['custom_field_id'])) {
       // buildOptions relies on the custom_* type of field names
-      $fieldName = sprintf('custom_%d', $spec->getCustomFieldId());
+      $fieldName = sprintf('custom_%d', $field['custom_field_id']);
     }
 
     // BAO::buildOptions returns a single-dimensional list, we call that first because of the hook contract,
     // @see CRM_Utils_Hook::fieldOptions
     // We then supplement the data with additional properties if requested.
-    $bao = CoreUtil::getBAOFromApiName($spec->getEntity());
+    $bao = CoreUtil::getBAOFromApiName($field['entity']);
     $optionLabels = $bao::buildOptions($fieldName, NULL, $values);
 
     if (!is_array($optionLabels)) {
       $options = FALSE;
     }
     else {
-      $options = \CRM_Utils_Array::makeNonAssociative($optionLabels, 'id', 'label');
+      $options = self::formatOptionList($field, $optionLabels);
       if (is_array($returnFormat) && $options) {
-        self::addOptionProps($options, $spec, $bao, $fieldName, $values, $returnFormat);
+        self::addOptionProps($options, $field, $bao, $fieldName, $values, $returnFormat);
       }
     }
     // Special 'current_domain' option
-    if ($spec->getFkEntity() === 'Domain') {
+    if ($field['fk_entity'] === 'Domain') {
       array_unshift($options, [
         'id' => 'current_domain',
         'name' => 'current_domain',
@@ -185,19 +192,41 @@ class SpecFormatter {
     return $options;
   }
 
+  private static function formatOptionList(array $field, array $optionLabels) {
+    $options = \CRM_Utils_Array::makeNonAssociative($optionLabels, 'id', 'label');
+    foreach ($options as &$option) {
+      switch ($field['data_type']) {
+        case 'String':
+        case 'Text':
+          $option['id'] = (string) $option['id'];
+          break;
+
+        case 'Float':
+        case 'Money':
+          $option['id'] = (float) $option['id'];
+          break;
+
+        case 'Integer':
+          $option['id'] = (int) $option['id'];
+          break;
+      }
+    }
+    return $options;
+  }
+
   /**
    * Augment the 2 values returned by BAO::buildOptions (id, label) with extra properties (name, description, color, icon, etc).
    *
    * We start with BAO::buildOptions in order to respect hooks which may be adding/removing items, then we add the extra data.
    *
    * @param array $options
-   * @param FieldSpec $spec
+   * @param array $field
    * @param \CRM_Core_DAO $baoName
    * @param string $fieldName
    * @param array $values
    * @param array $returnFormat
    */
-  private static function addOptionProps(&$options, $spec, $baoName, $fieldName, $values, $returnFormat) {
+  private static function addOptionProps(&$options, $field, $baoName, $fieldName, $values, $returnFormat) {
     // FIXME: For now, call the buildOptions function again and then combine the arrays. Not an ideal approach.
     // TODO: Teach CRM_Core_Pseudoconstant to always load multidimensional option lists so we can get more properties like 'color' and 'icon',
     // however that might require a change to the hook_civicrm_fieldOptions signature so that's a bit tricky.
@@ -208,8 +237,8 @@ class SpecFormatter {
     // CRM_Core_Pseudoconstant doesn't know how to fetch extra stuff like icon, description, color, etc., so we have to invent that wheel here...
     if ($returnFormat) {
       $optionIndex = array_flip(array_column($options, 'id'));
-      if ($spec instanceof CustomFieldSpec) {
-        $optionGroupId = \CRM_Core_DAO::getFieldValue('CRM_Core_DAO_CustomField', $spec->getCustomFieldId(), 'option_group_id');
+      if (!empty($field['custom_field_id'])) {
+        $optionGroupId = \CRM_Core_BAO_CustomField::getField($field['custom_field_id'])['option_group_id'];
       }
       else {
         $dao = new $baoName();
@@ -279,9 +308,8 @@ class SpecFormatter {
    * @param string $dataTypeName
    */
   public static function setInputTypeAndAttrs(FieldSpec $fieldSpec, $data, $dataTypeName) {
-    $inputType = $data['html']['type'] ?? $data['html_type'] ?? NULL;
-    $inputAttrs = $data['html'] ?? [];
-    unset($inputAttrs['type']);
+    $inputType = $data['input_type'] ?? $data['html_type'] ?? NULL;
+    $inputAttrs = $data['input_attrs'] ?? [];
     // Custom field EntityRef or ContactRef filters
     if (is_string($data['filter'] ?? NULL) && strpos($data['filter'], '=')) {
       $filters = explode('&', $data['filter']);

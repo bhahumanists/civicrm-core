@@ -438,7 +438,7 @@ abstract class CRM_Utils_Hook {
    * @return null
    *   the return value is ignored
    */
-  public static function links($op, $objectName, &$objectId, &$links, &$mask = NULL, &$values = []) {
+  public static function links($op, $objectName, $objectId, &$links, &$mask = NULL, &$values = []) {
     return self::singleton()->invoke(['op', 'objectName', 'objectId', 'links', 'mask', 'values'], $op, $objectName, $objectId, $links, $mask, $values, 'civicrm_links');
   }
 
@@ -648,8 +648,8 @@ abstract class CRM_Utils_Hook {
    * @param array $conditions
    *   Values from WHERE or ON clause
    */
-  public static function selectWhereClause($entity, array &$clauses, int $userId = NULL, array $conditions = []): void {
-    $entityName = is_object($entity) ? CRM_Core_DAO_AllCoreTables::getBriefName(get_class($entity)) : $entity;
+  public static function selectWhereClause($entity, array &$clauses, ?int $userId = NULL, array $conditions = []): void {
+    $entityName = is_object($entity) ? CRM_Core_DAO_AllCoreTables::getEntityNameForClass(get_class($entity)) : $entity;
     $null = NULL;
     $userId ??= (int) CRM_Core_Session::getLoggedInContactID();
     self::singleton()->invoke(['entity', 'clauses', 'userId', 'conditions'],
@@ -974,6 +974,8 @@ abstract class CRM_Utils_Hook {
    *   The list of tokens associated with the content.
    * @param string $className
    *   The top level className from where the hook is invoked.
+   *
+   * @deprecated since 5.71 will be removed sometime after all core uses are fully removed.
    *
    * @return null
    */
@@ -1617,21 +1619,25 @@ abstract class CRM_Utils_Hook {
   /**
    * This hook allows modification of the queries constructed from dupe rules.
    *
+   * @deprecated since 5.72
+   *
    * @param string $obj
    *   Object of rulegroup class.
    * @param string $type
    *   Type of queries e.g table / threshold.
    * @param array $query
    *   Set of queries.
-   *
-   * @return mixed
    */
   public static function dupeQuery($obj, $type, &$query) {
     $null = NULL;
-    return self::singleton()->invoke(['obj', 'type', 'query'], $obj, $type, $query,
+    $original = $query;
+    self::singleton()->invoke(['obj', 'type', 'query'], $obj, $type, $query,
       $null, $null, $null,
       'civicrm_dupeQuery'
     );
+    if ($original !== $query && $type !== 'supportedFields') {
+      CRM_Core_Error::deprecatedWarning('hook_civicrm_dupeQuery is deprecated.');
+    }
   }
 
   /**
@@ -1669,13 +1675,15 @@ abstract class CRM_Utils_Hook {
    * @param array &$result the result returned by the api call
    * @param string $action
    *   (optional ) the requested action to be performed if the types was 'mailing'.
+   * @param int|null $mailSettingId
+   *   The MailSetting ID the email relates to
    *
    * @return mixed
    */
-  public static function emailProcessor($type, &$params, $mail, &$result, $action = NULL) {
+  public static function emailProcessor($type, &$params, $mail, &$result, $action = NULL, ?int $mailSettingId = NULL) {
     $null = NULL;
     return self::singleton()
-      ->invoke(['type', 'params', 'mail', 'result', 'action'], $type, $params, $mail, $result, $action, $null, 'civicrm_emailProcessor');
+      ->invoke(['type', 'params', 'mail', 'result', 'action', 'mailSettingId'], $type, $params, $mail, $result, $action, $mailSettingId, 'civicrm_emailProcessor');
   }
 
   /**
@@ -2188,7 +2196,7 @@ abstract class CRM_Utils_Hook {
    *   TRUE, if $op is 'check' and upgrades are pending.
    *   FALSE, if $op is 'check' and upgrades are not pending.
    */
-  public static function upgrade($op, CRM_Queue_Queue $queue = NULL) {
+  public static function upgrade($op, ?CRM_Queue_Queue $queue = NULL) {
     $null = NULL;
     return self::singleton()->invoke(['op', 'queue'], $op, $queue,
       $null, $null, $null, $null,
@@ -2310,6 +2318,7 @@ abstract class CRM_Utils_Hook {
    *
    * @return null
    *   The return value is ignored
+   * @throws RuntimeException
    */
   public static function permission(&$newPermissions) {
     $null = NULL;

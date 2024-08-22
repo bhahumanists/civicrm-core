@@ -58,6 +58,9 @@ class CRM_Profile_Form extends CRM_Core_Form {
    * The group id that we are passing in url.
    *
    * @var int
+   *
+   * @deprecated
+   * @internal
    */
   public $_grid;
 
@@ -154,6 +157,8 @@ class CRM_Profile_Form extends CRM_Core_Form {
   protected $_deleteButtonName = NULL;
 
   protected $_customGroupId = NULL;
+
+  protected $_mail;
 
   protected $_currentUserID = NULL;
   protected $_session = NULL;
@@ -482,11 +487,15 @@ class CRM_Profile_Form extends CRM_Core_Form {
           $page = new CRM_Profile_Page_MultipleRecordFieldsListing();
           $cs = $this->get('cs');
           $page->set('pageCheckSum', $cs);
-          $page->set('contactId', $this->_id);
-          $page->set('profileId', $this->_gid);
+          $page->_contactId = $this->_id;
+          $page->setProfileID($this->_gid);
           $page->set('action', CRM_Core_Action::BROWSE);
-          $page->set('multiRecordFieldListing', $multiRecordFieldListing);
-          $page->run();
+          $action = CRM_Utils_Request::retrieve('action', 'String', $this, FALSE, FALSE);
+          // assign vars to templates
+          $page->assign('action', $action);
+          $page->_pageViewType = 'profileDataView';
+
+          $page->browse();
         }
       }
 
@@ -805,7 +814,7 @@ class CRM_Profile_Form extends CRM_Core_Form {
       // if we are a admin OR the same user OR acl-user with access to the profile
       // or we have checksum access to this contact (i.e. the user without a login) - CRM-5909
       if (
-        CRM_Core_Permission::check('administer users') ||
+        CRM_Core_Permission::check('cms:administer users') ||
         $this->_id == $this->_currentUserID ||
         $this->_isPermissionedChecksum ||
         in_array(

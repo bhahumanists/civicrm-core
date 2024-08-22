@@ -211,10 +211,7 @@ class CRM_Contact_Page_View_Summary extends CRM_Contact_Page_View {
         if (!empty($blockVal['master_id'])) {
           $idValue = $blockVal['master_id'];
         }
-        $groupTree = CRM_Core_BAO_CustomGroup::getTree(ucfirst('address'), NULL, $idValue, NULL, [],
-          NULL, TRUE, NULL, FALSE, CRM_Core_Permission::VIEW);
-        // we setting the prefix to dnc_ below so that we don't overwrite smarty's grouptree var.
-        $defaults['address'][$blockId]['custom'] = CRM_Core_BAO_CustomGroup::buildCustomDataView($this, $groupTree, FALSE, NULL, "dnc_");
+        $defaults['address'][$blockId]['custom'] = $this->addBlockCustomData('Address', $idValue);
       }
       // reset template variable since that won't be of any use, and could be misleading
       $this->assign("dnc_viewCustomData", NULL);
@@ -276,7 +273,7 @@ class CRM_Contact_Page_View_Summary extends CRM_Contact_Page_View {
     // FIXME: when we sort out TZ isssues with DATETIME/TIMESTAMP, we can skip next query
     // also assign the last modifed details
     $lastModified = CRM_Core_BAO_Log::lastModified($this->_contactId, 'civicrm_contact');
-    $this->assign_by_ref('lastModified', $lastModified);
+    $this->assign('lastModified', $lastModified);
 
     $this->_viewOptions = CRM_Core_BAO_Setting::valueOptions(
       CRM_Core_BAO_Setting::SYSTEM_PREFERENCES_NAME,
@@ -285,7 +282,7 @@ class CRM_Contact_Page_View_Summary extends CRM_Contact_Page_View {
     );
 
     $changeLog = $this->_viewOptions['log'];
-    $this->assign_by_ref('changeLog', $changeLog);
+    $this->assign('changeLog', $changeLog);
 
     $this->assign('allTabs', $this->getTabs($defaults));
 
@@ -294,7 +291,7 @@ class CRM_Contact_Page_View_Summary extends CRM_Contact_Page_View {
     $contentPlacement = CRM_Utils_Hook::SUMMARY_BELOW;
     CRM_Utils_Hook::summary($this->_contactId, $content, $contentPlacement);
     if ($content) {
-      $this->assign_by_ref('hookContent', $content);
+      $this->assign('hookContent', $content);
       $this->assign('hookContentPlacement', $contentPlacement);
     }
   }
@@ -514,6 +511,20 @@ class CRM_Contact_Page_View_Summary extends CRM_Contact_Page_View {
       }
     }
     return $locationEntities;
+  }
+
+  /**
+   * @param $idValue
+   * @param $entity
+   *
+   * @return array
+   * @throws \CRM_Core_Exception
+   */
+  private function addBlockCustomData($entity, $idValue): array {
+    $groupTree = CRM_Core_BAO_CustomGroup::getTree($entity, NULL, $idValue, NULL, [],
+      NULL, TRUE, NULL, FALSE, CRM_Core_Permission::VIEW);
+    // we setting the prefix to dnc_ below so that we don't overwrite smarty's grouptree var.
+    return CRM_Core_BAO_CustomGroup::buildCustomDataView($this, $groupTree, FALSE, NULL, "dnc_");
   }
 
 }

@@ -197,9 +197,9 @@ class CRM_Utils_System_Standalone extends CRM_Utils_System_Base {
    *   the current menu path
    */
   public static function currentPath() {
-    $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-    $path = trim($path, '/');
-    return $path;
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+
+    return $path ? trim($path, '/') : NULL;
   }
 
   /**
@@ -243,6 +243,22 @@ class CRM_Utils_System_Standalone extends CRM_Utils_System_Base {
    */
   public function logout() {
     return Security::singleton()->logoutUser();
+  }
+
+  /**
+   * @inheritDoc
+   *
+   * Standalone offers different HTML templates for front and back-end routes.
+   *
+   */
+  public static function getContentTemplate($print = 0): string {
+    if ($print) {
+      return parent::getContentTemplate($print);
+    }
+    else {
+      $isPublic = CRM_Utils_System::isFrontEndPage();
+      return $isPublic ? 'CRM/common/standalone-frontend.tpl' : 'CRM/common/standalone.tpl';
+    }
   }
 
   /**
@@ -352,7 +368,7 @@ class CRM_Utils_System_Standalone extends CRM_Utils_System_Base {
     }
 
     return [
-      'url' => CRM_Utils_File::addTrailingSlash(CIVICRM_UF_BASEURL, '/') . '/core/',
+      'url' => CRM_Utils_File::addTrailingSlash(CIVICRM_UF_BASEURL, '/') . 'core/',
       'path' => CRM_Utils_File::addTrailingSlash($civicrm_root),
     ];
   }
@@ -370,6 +386,10 @@ class CRM_Utils_System_Standalone extends CRM_Utils_System_Base {
       return $civicrm_paths['cms.root']['path'];
     }
     throw new \RuntimeException("Standalone requires the path is set for now. Set \$civicrm_paths['cms.root']['path'] in civicrm.settings.php to the webroot.");
+  }
+
+  public function isFrontEndPage() {
+    return CRM_Core_Menu::isPublicRoute(CRM_Utils_System::currentPath() ?? '');
   }
 
   /**
@@ -420,10 +440,12 @@ class CRM_Utils_System_Standalone extends CRM_Utils_System_Base {
   }
 
   /**
-   * @inheritDoc
+   * CMS User Sync doesn't make sense when using standaloneusers
+   * (but leave open the door for other user extensions, which might have a sync method)
+   * @return bool
    */
-  public function synchronizeUsers() {
-    return Security::singleton()->synchronizeUsers();
+  public function allowSynchronizeUsers() {
+    return !\CRM_Extension_System::singleton()->getManager()->isEnabled('standaloneusers');
   }
 
   /**
@@ -553,8 +575,18 @@ class CRM_Utils_System_Standalone extends CRM_Utils_System_Base {
    * Start a new session.
    */
   public function sessionStart() {
-    $session_handler = new SessionHandler();
-    session_set_save_handler($session_handler);
+    if (defined('CIVI_SETUP')) {
+      // during installation we can't use the session
+      // handler from the extension yet so we just
+      // use a default php session
+      // use a different cookie name to avoid any nasty clash
+      $session_cookie_name = 'SESSCIVISOINSTALL';
+    }
+    else {
+      $session_handler = new SessionHandler();
+      session_set_save_handler($session_handler);
+      $session_cookie_name = 'SESSCIVISO';
+    }
 
     $session_max_lifetime = Civi::settings()->get('standaloneusers_session_max_lifetime') ?? 1440;
 
@@ -562,7 +594,7 @@ class CRM_Utils_System_Standalone extends CRM_Utils_System_Base {
       'cookie_httponly'  => 1,
       'cookie_secure'    => !empty($_SERVER['HTTPS']),
       'gc_maxlifetime'   => $session_max_lifetime,
-      'name'             => 'SESSCIVISO',
+      'name'             => $session_cookie_name,
       'use_cookies'      => 1,
       'use_only_cookies' => 1,
       'use_strict_mode'  => 1,

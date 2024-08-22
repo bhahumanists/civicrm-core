@@ -56,6 +56,7 @@ class Admin {
         ->addWhere('used_for', 'CONTAINS', 'civicrm_saved_search')
         ->execute(),
       'myName' => \CRM_Core_Session::singleton()->getLoggedInContactDisplayName(),
+      'dateFormats' => self::getDateFormats(),
     ];
     $perms = \Civi\Api4\Permission::get()
       ->addWhere('group', 'IN', ['civicrm', 'cms'])
@@ -278,10 +279,14 @@ class Admin {
   public static function getJoins(array $allowedEntities):array {
     $joins = [];
     foreach ($allowedEntities as $entity) {
-      $isMultiValueCustomEntity = in_array('CustomValue', $entity['type'], TRUE);
+      $isVirtualEntity = (bool) array_intersect(['CustomValue', 'SavedSearch'], $entity['type']);
 
-      // Normal DAO entities (excludes multi-value custom field entities)
-      if (!empty($entity['dao']) && !$isMultiValueCustomEntity) {
+      // Normal DAO entities (excludes virtual entities)
+      // FIXME: At this point DAO entities have enough metadata that using getReferenceColumns()
+      // is no longer necessary and they could be handled the same as virtual entities.
+      // So this entire block could, in theory, be removed in favor of the foreach loop below.
+      // Just need a solid before/after comparison to ensure the output stays stable.
+      if (!empty($entity['dao']) && !$isVirtualEntity) {
         /** @var \CRM_Core_DAO $daoClass */
         $daoClass = $entity['dao'];
         $references = $daoClass::getReferenceColumns();
@@ -307,18 +312,14 @@ class Admin {
 
             // For dynamic references getTargetEntities will return multiple targets; for normal joins this loop will only run once
             foreach ($reference->getTargetEntities() as $dynamicValue => $targetEntityName) {
-              if (
-                !isset($allowedEntities[$targetEntityName]) ||
-                // What to do with self-references? They're weird but sometimes useful.
-                // For now, only allowing it for dynamic columns since they're explicitly declared
-                // (e.g. a Note can be a comment on a Note), and only the 1-n join since n-1 can be done with implicit joins.
-                ($targetEntityName === $entity['name'] && !$dynamicCol)
-              ) {
+              if (!isset($allowedEntities[$targetEntityName])) {
+                // Skip if target entity doesn't exist
                 continue;
               }
               $targetEntity = $allowedEntities[$targetEntityName];
-              // Add the straight 1-1 join (but only if it's not a reference to itself, see above)
-              if ($targetEntityName !== $entity['name']) {
+              $isSelf = $targetEntityName === $entity['name'];
+              // Add the straight 1-1 join (but only if it's not a reference to itself, those can be done with implicit joins)
+              if (!$isSelf) {
                 $alias = $entity['name'] . '_' . $targetEntityName . '_' . $keyField['name'];
                 $joins[$entity['name']][] = [
                   'label' => $entity['title'] . ' ' . ($dynamicCol ? $targetEntity['title'] : $keyField['label']),
@@ -333,8 +334,8 @@ class Admin {
               // Flip the conditions & add the reverse (1-n) join
               $alias = $targetEntityName . '_' . $entity['name'] . '_' . $keyField['name'];
               $joins[$targetEntityName][] = [
-                'label' => $targetEntity['title'] . ' ' . $entity['title_plural'],
-                'description' => $dynamicCol ? '' : $keyField['label'],
+                'label' => ($isSelf ? $keyField['label'] : $targetEntity['title']) . ' ' . $entity['title_plural'],
+                'description' => $dynamicCol || $isSelf ? '' : $keyField['label'],
                 'entity' => $entity['name'],
                 'conditions' => self::getJoinConditions($reference->getTargetKey(), $alias . '.' . $keyField['name'], $dynamicValue, $dynamicCol ? $alias . '.' . $dynamicCol : NULL),
                 'defaults' => self::getJoinDefaults($alias, $entity),
@@ -395,15 +396,23 @@ class Admin {
         }
       }
 
-      // Custom EntityRef joins
+      // This handles joins for custom fields and virtual entities which don't have a DAO.
       foreach ($entity['fields'] as $field) {
-        if (($field['type'] === 'Custom' || $isMultiValueCustomEntity) && $field['fk_entity'] && $field['input_type'] === 'EntityRef') {
+        // FIXME: See comment above: this loop should be able to handle every entity.
+        // Above block could be removed and the first part of this conditional
+        // `($field['type'] === 'Custom' || $isVirtualEntity)` can be removed.
+        if (($field['type'] === 'Custom' || $isVirtualEntity) && $field['fk_entity'] && $field['input_type'] === 'EntityRef') {
           $entityRefJoins = self::getEntityRefJoins($entity, $field);
           foreach ($entityRefJoins as $joinEntity => $joinInfo) {
             $joins[$joinEntity][] = $joinInfo;
           }
         }
       }
+    }
+    // Add contact joins to the contactType pseudo-entities
+    foreach (\CRM_Contact_BAO_ContactType::basicTypes() as $contactType) {
+      $joins += [$contactType => []];
+      $joins[$contactType] = array_merge($joins[$contactType], $joins['Contact']);
     }
     return $joins;
   }
@@ -432,7 +441,7 @@ class Admin {
       $alias = "{$field['fk_entity']}_{$entity['name']}_$bareFieldName";
       $joins[$field['fk_entity']] = [
         'label' => $entity['title_plural'],
-        'description' => $entity['description'],
+        'description' => $entity['description'] ?? '',
         'entity' => $entity['name'],
         'conditions' => self::getJoinConditions('id', "$alias.{$field['name']}"),
         'defaults' => [],
@@ -572,6 +581,14 @@ class Admin {
       return $a['title'] <=> $b['title'];
     });
     return $functions;
+  }
+
+  private static function getDateFormats(): array {
+    return \Civi\Api4\Setting::getFields(FALSE)
+      ->addWhere('name', 'LIKE', 'dateformat%')
+      ->execute()
+      ->indexBy('name')
+      ->column('title');
   }
 
 }

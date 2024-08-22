@@ -23,7 +23,7 @@
     $scope.hs = crmUiHelp({file: 'CRM/Search/Help/Compose'});
 
     this.afformEnabled = 'org.civicrm.afform' in CRM.crmSearchAdmin.modules;
-    this.afformAdminEnabled = (CRM.checkPerm('administer CiviCRM') || CRM.checkPerm('administer afform')) &&
+    this.afformAdminEnabled = CRM.checkPerm('administer afform') &&
       'org.civicrm.afform_admin' in CRM.crmSearchAdmin.modules;
     this.displayTypes = _.indexBy(CRM.crmSearchAdmin.displayTypes, 'id');
     this.searchDisplayPath = CRM.url('civicrm/search');
@@ -237,7 +237,7 @@
       if (display.id) {
         display.trashed = !display.trashed;
         if ($scope.controls.tab === ('display_' + index) && display.trashed) {
-          $scope.selectTab('compose');
+          $scope.selectTab('for');
         } else if (!display.trashed) {
           $scope.selectTab('display_' + index);
         }
@@ -255,7 +255,7 @@
           });
         }
       } else {
-        $scope.selectTab('compose');
+        $scope.selectTab('for');
         ctrl.savedSearch.displays.splice(index, 1);
       }
     };
@@ -300,7 +300,7 @@
         ctrl.savedSearch.groups.length = 0;
       }
       if ($scope.controls.tab === 'group') {
-        $scope.selectTab('compose');
+        $scope.selectTab('for');
       }
     };
 
@@ -424,8 +424,8 @@
         if (ctrl.mustAggregate(col)) {
           // Ensure all non-grouped columns are aggregated if using GROUP BY
           if (!info.fn || info.fn.category !== 'aggregate') {
-            var dflFn = searchMeta.getDefaultAggregateFn(info) || 'GROUP_CONCAT',
-              flagBefore = dflFn === 'GROUP_CONCAT' ? 'DISTINCT ' : '';
+            let dflFn = searchMeta.getDefaultAggregateFn(info, ctrl.savedSearch.api_params) || 'GROUP_CONCAT';
+            let flagBefore = dflFn === 'GROUP_CONCAT' ? 'DISTINCT ' : '';
             ctrl.savedSearch.api_params.select[pos] = dflFn + '(' + flagBefore + fieldExpr + ') AS ' + dflFn + '_' + fieldExpr.replace(/[.:]/g, '_');
           }
         } else {

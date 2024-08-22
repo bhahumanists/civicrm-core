@@ -158,7 +158,7 @@ class CRM_Contact_BAO_Relationship extends CRM_Contact_DAO_Relationship implemen
    * @throws \CRM_Core_Exception
    */
   public static function add($params, $ids = []) {
-    $params['id'] = CRM_Utils_Array::value('relationship', $ids, CRM_Utils_Array::value('id', $params));
+    $params['id'] = $ids['relationship'] ?? $params['id'] ?? NULL;
 
     $hook = 'create';
     if ($params['id']) {
@@ -2280,7 +2280,7 @@ SELECT count(*)
       if (empty($record["contact_id_$ab"]) && !empty($record['id'])) {
         $record["contact_id_$ab"] = CRM_Core_DAO::getFieldValue(__CLASS__, $record['id'], "contact_id_$ab");
       }
-      if (!\Civi\Api4\Utils\CoreUtil::checkAccessDelegated('Contact', $delegateAction, ['id' => $record["contact_id_$ab"]], $userID)) {
+      if (!empty($record["contact_id_$ab"]) && !\Civi\Api4\Utils\CoreUtil::checkAccessDelegated('Contact', $delegateAction, ['id' => $record["contact_id_$ab"]], $userID)) {
         $e->setAuthorized(FALSE);
         break;
       }

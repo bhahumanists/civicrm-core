@@ -391,7 +391,7 @@ class CRM_Upgrade_Incremental_Base {
       }
       $schema = new CRM_Logging_Schema();
       if ($schema->isEnabled()) {
-        $schema->fixSchemaDifferencesFor($table);
+        $schema->fixSchemaDifferencesFor($table, [], TRUE);
       }
     }
     if ($locales && $triggerRebuild) {
@@ -613,7 +613,7 @@ class CRM_Upgrade_Incremental_Base {
     }
     $schema = new CRM_Logging_Schema();
     if ($schema->isEnabled()) {
-      $schema->fixSchemaDifferencesFor($table);
+      $schema->fixSchemaDifferencesFor($table, [], TRUE);
     }
     $locales = CRM_Core_I18n::getMultilingual();
     if ($locales) {
@@ -720,11 +720,30 @@ class CRM_Upgrade_Incremental_Base {
     }
     $schema = new CRM_Logging_Schema();
     if ($schema->isEnabled()) {
-      $schema->fixSchemaDifferencesFor($table);
+      $schema->fixSchemaDifferencesFor($table, [], TRUE);
     }
     if ($locales) {
       CRM_Core_I18n_Schema::rebuildMultilingualSchema($locales, NULL, TRUE);
     }
+    return TRUE;
+  }
+
+  /**
+   * Installs a newly-added core entity.
+   *
+   * The entityType.php file should be copied into CRM/Upgrade/Incremental/schema
+   * and prefixed with the version-added.
+   *
+   * @param $ctx
+   * @param string $fileName
+   * @return bool
+   * @throws DBQueryException
+   */
+  public static function createEntityTable($ctx, string $fileName): bool {
+    $filePath = __DIR__ . "/schema/$fileName";
+    $entityDefn = include $filePath;
+    $sql = Civi::schemaHelper()->arrayToSql($entityDefn);
+    CRM_Core_DAO::executeQuery($sql);
     return TRUE;
   }
 

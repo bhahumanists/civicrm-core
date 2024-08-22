@@ -103,12 +103,12 @@ class CRM_Core_Resources implements CRM_Core_Resources_CollectionAdderInterface 
   /**
    * Get or set the single instance of CRM_Core_Resources.
    *
-   * @param CRM_Core_Resources $instance
+   * @param CRM_Core_Resources|null $instance
    *   New copy of the manager.
    *
    * @return CRM_Core_Resources
    */
-  public static function singleton(CRM_Core_Resources $instance = NULL) {
+  public static function singleton(?CRM_Core_Resources $instance = NULL) {
     if ($instance !== NULL) {
       self::$_singleton = $instance;
     }
@@ -381,9 +381,11 @@ class CRM_Core_Resources implements CRM_Core_Resources_CollectionAdderInterface 
     if (!self::isAjaxMode()) {
       $this->addBundle('coreResources');
       $this->addCoreStyles($region);
-      // This ensures that if a popup link requires AngularJS, it will always be available.
-      // Additional Ang modules required by popups will be loaded on-the-fly by Civi\Angular\AngularLoader
-      Civi::service('angularjs.loader')->addModules(['crmResource']);
+      if (!CRM_Core_Config::isUpgradeMode()) {
+        // This ensures that if a popup link requires AngularJS, it will always be available.
+        // Additional Ang modules required by popups will be loaded on-the-fly by Civi\Angular\AngularLoader
+        Civi::service('angularjs.loader')->addModules(['crmResource']);
+      }
     }
     return $this;
   }
@@ -504,7 +506,7 @@ class CRM_Core_Resources implements CRM_Core_Resources_CollectionAdderInterface 
    *   is this page request an ajax snippet?
    */
   public static function isAjaxMode() {
-    if (in_array(CRM_Utils_Array::value('snippet', $_REQUEST), [
+    if (in_array($_REQUEST['snippet'] ?? '', [
       CRM_Core_Smarty::PRINT_SNIPPET,
       CRM_Core_Smarty::PRINT_NOFORM,
       CRM_Core_Smarty::PRINT_JSON,
@@ -512,8 +514,9 @@ class CRM_Core_Resources implements CRM_Core_Resources_CollectionAdderInterface 
     ) {
       return TRUE;
     }
-    [$arg0, $arg1] = array_pad(explode('/', (CRM_Utils_System::currentPath() ?? '')), 2, '');
-    return ($arg0 === 'civicrm' && in_array($arg1, ['ajax', 'angularprofiles', 'asset']));
+    $path = explode('/', (CRM_Utils_System::currentPath() ?? ''));
+    [$arg0, $arg1] = array_pad($path, 2, '');
+    return ($arg0 === 'civicrm' && (in_array($arg1, ['angularprofiles', 'asset']) || in_array('ajax', $path, TRUE)));
   }
 
   /**

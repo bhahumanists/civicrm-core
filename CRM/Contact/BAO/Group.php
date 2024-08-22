@@ -317,7 +317,7 @@ class CRM_Contact_BAO_Group extends CRM_Contact_DAO_Group implements HookInterfa
    * @param array $conditions
    * @inheritDoc
    */
-  public function addSelectWhereClause(string $entityName = NULL, int $userId = NULL, array $conditions = []): array {
+  public function addSelectWhereClause(?string $entityName = NULL, ?int $userId = NULL, array $conditions = []): array {
     $clauses = [];
     if (!CRM_Core_Permission::check([['edit all contacts', 'view all contacts']])) {
       $allowedGroups = CRM_Core_Permission::group(NULL, FALSE);
@@ -712,8 +712,8 @@ class CRM_Contact_BAO_Group extends CRM_Contact_DAO_Group implements HookInterfa
       //create group only when new saved search.
       $groupParams = [
         'title' => "Hidden Smart Group {$ssId}",
-        'is_active' => CRM_Utils_Array::value('is_active', $params, 1),
-        'is_hidden' => CRM_Utils_Array::value('is_hidden', $params, 1),
+        'is_active' => $params['is_active'] ?? 1,
+        'is_hidden' => $params['is_hidden'] ?? 1,
         'group_type' => $params['group_type'] ?? NULL,
         'visibility' => $params['visibility'] ?? NULL,
         'saved_search_id' => $ssId,

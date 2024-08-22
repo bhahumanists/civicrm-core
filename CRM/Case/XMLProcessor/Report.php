@@ -753,7 +753,7 @@ LIMIT  1
 
     // first get all case information
     $case = $form->caseInfo($clientID, $caseID);
-    $template->assign_by_ref('case', $case);
+    $template->assign('case', $case);
 
     if (($params['include_activities'] ?? NULL) == 1) {
       $template->assign('includeActivities', 'All');
@@ -785,12 +785,12 @@ LIMIT  1
       'includeActivities' => 'All',
       'redact' => 'false',
     ];
-    $template->assign_by_ref('activitySet', $activitySet);
+    $template->assign('activitySet', $activitySet);
 
     //now collect all the information about activities
     $activities = [];
     $form->getActivities($clientID, $caseID, $activityTypes, $activities);
-    $template->assign_by_ref('activities', $activities);
+    $template->assign('activities', $activities);
 
     return $template;
   }
@@ -959,8 +959,7 @@ LIMIT  1
 
     // Retrieve custom values for cases.
     $customValues = CRM_Core_BAO_CustomValueTable::getEntityValues($caseID, 'Case');
-    $extends = ['case'];
-    $groupTree = CRM_Core_BAO_CustomGroup::getGroupDetail(NULL, NULL, $extends);
+    $groupTree = CRM_Core_BAO_CustomGroup::getAll(['extends' => ['Case']]);
     $caseCustomFields = [];
     foreach ($groupTree as $gid => $group_values) {
       foreach ($group_values['fields'] as $id => $field_values) {

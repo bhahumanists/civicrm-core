@@ -24,6 +24,7 @@
  *
  * @method static void getCMSPermissionsUrlParams() Immediately stop script execution and display a 401 "Access Denied" page.
  * @method static mixed permissionDenied() Show access denied screen.
+ * @method static string getContentTemplate(int|string $print = 0) Get the template path to render whole content.
  * @method static mixed logout() Log out the current user.
  * @method static mixed updateCategories() Clear CMS caches related to the user registration/profile forms.
  * @method static void appendBreadCrumb(array $breadCrumbs) Append an additional breadcrumb link to the existing breadcrumbs.
@@ -276,6 +277,17 @@ class CRM_Utils_System {
     if ($path && str_contains($path, '?')) {
       [$path, $extraQuery] = explode('?', $path);
       $query = $extraQuery . ($query ? "&$query" : '');
+    }
+
+    if ($frontend === FALSE && $forceBackend === FALSE && !empty($GLOBALS['civicrm_url_defaults'])) {
+      // Caller appears to want the "current://" scheme. For newer environments (eg web-service/iframe;
+      // not frontend/backend), we need
+      $urlObj = \Civi::url('current://' . $path)
+        ->addQuery($query)
+        ->addFragment($fragment)
+        ->setPreferFormat($absolute ? 'absolute' : 'relative')
+        ->setHtmlEscape($htmlize);
+      return (string) $urlObj;
     }
 
     $config = CRM_Core_Config::singleton();
@@ -1509,8 +1521,7 @@ class CRM_Utils_System {
       = CRM_Contribute_BAO_Contribution::$_importableFields
         = CRM_Contribute_BAO_Contribution::$_exportableFields
           = CRM_Pledge_BAO_Pledge::$_exportableFields
-            = CRM_Core_BAO_CustomField::$_importFields
-              = CRM_Core_DAO::$_dbColumnValueCache = NULL;
+            = CRM_Core_DAO::$_dbColumnValueCache = NULL;
 
     CRM_Core_OptionGroup::flushAll();
     CRM_Utils_PseudoConstant::flushAll();
@@ -1881,7 +1892,7 @@ class CRM_Utils_System {
       $action = strtolower($action);
     }
 
-    $daoClass = isset($crudLinkSpec['entity']) ? CRM_Core_DAO_AllCoreTables::getFullName($crudLinkSpec['entity']) : CRM_Core_DAO_AllCoreTables::getClassForTable($crudLinkSpec['entity_table']);
+    $daoClass = isset($crudLinkSpec['entity']) ? CRM_Core_DAO_AllCoreTables::getDAONameForEntity($crudLinkSpec['entity']) : CRM_Core_DAO_AllCoreTables::getClassForTable($crudLinkSpec['entity_table']);
     $paths = $daoClass ? $daoClass::getEntityPaths() : [];
     $path = $paths[$action] ?? NULL;
     if (!$path) {

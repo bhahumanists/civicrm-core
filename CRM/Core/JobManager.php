@@ -32,8 +32,18 @@ class CRM_Core_JobManager {
    */
   public $currentJob = NULL;
 
+  /**
+   * @var array
+   *
+   * @fixme How are these set? What do they do?
+   */
   public $singleRunParams = [];
 
+  /**
+   * @var string|null
+   *
+   * @fixme Looks like this is only used by "singleRun"
+   */
   public $_source = NULL;
 
   /**
@@ -124,7 +134,7 @@ class CRM_Core_JobManager {
     try {
       $result = civicrm_api($job->api_entity, $job->api_action, $params);
     }
-    catch (Exception$e) {
+    catch (Exception $e) {
       $this->logEntry('Error while executing ' . $job->name . ': ' . $e->getMessage());
       $result = $e;
     }
@@ -132,11 +142,8 @@ class CRM_Core_JobManager {
     $this->logEntry('Finished execution of ' . $job->name . ' with result: ' . $this->apiResultToMessage($result));
     $this->currentJob = FALSE;
 
-    //Disable outBound option after executing the job.
-    $environment = CRM_Core_Config::environment(NULL, TRUE);
-    if ($environment != 'Production' && !empty($job->apiParams['runInNonProductionEnvironment'])) {
-      Civi::settings()->set('mailing_backend', ['outBound_option' => CRM_Mailing_Config::OUTBOUND_OPTION_DISABLED]);
-    }
+    // Save the job last run end date (if this doesn't get written we know the job crashed and was not caught (eg. OOM).
+    $job->saveLastRunEnd();
   }
 
   /**
@@ -191,7 +198,7 @@ class CRM_Core_JobManager {
    * @param $entity
    * @param $job
    * @param array $params
-   * @param null $source
+   * @param string|null $source
    */
   public function setSingleRunParams($entity, $job, $params, $source = NULL) {
     $this->_source = $source;

@@ -110,6 +110,13 @@ class CRM_Event_BAO_Participant extends CRM_Event_DAO_Participant implements \Ci
 
     $participantBAO->save();
 
+    // add custom field values
+    if (!empty($params['custom']) &&
+      is_array($params['custom'])
+    ) {
+      CRM_Core_BAO_CustomValueTable::store($params['custom'], 'civicrm_participant', $participantBAO->id);
+    }
+
     CRM_Contact_BAO_GroupContactCache::opportunisticCacheFlush();
 
     if (!empty($params['id'])) {
@@ -170,11 +177,6 @@ class CRM_Event_BAO_Participant extends CRM_Event_DAO_Participant implements \Ci
 
     $participant = self::add($params);
 
-    if (is_a($participant, 'CRM_Core_Error')) {
-      $transaction->rollback();
-      return $participant;
-    }
-
     // Log activity when creating new participant or changing status
     if (empty($params['id']) ||
       (isset($params['status_id']) && $params['status_id'] != $status)
@@ -194,13 +196,6 @@ class CRM_Event_BAO_Participant extends CRM_Event_DAO_Participant implements \Ci
     $id = $session->get('userID');
     if (!$id) {
       $id = $params['contact_id'] ?? NULL;
-    }
-
-    // add custom field values
-    if (!empty($params['custom']) &&
-      is_array($params['custom'])
-    ) {
-      CRM_Core_BAO_CustomValueTable::store($params['custom'], 'civicrm_participant', $participant->id);
     }
 
     //process note, CRM-7634
@@ -224,13 +219,9 @@ class CRM_Event_BAO_Participant extends CRM_Event_DAO_Participant implements \Ci
           'entity_table' => 'civicrm_participant',
           'note' => $noteValue,
           'entity_id' => $participant->id,
-          'contact_id' => $id,
+          'id' => $noteId,
         ];
-        $noteIDs = [];
-        if ($noteId) {
-          $noteIDs['id'] = $noteId;
-        }
-        CRM_Core_BAO_Note::add($noteParams, $noteIDs);
+        CRM_Core_BAO_Note::add($noteParams);
       }
       elseif ($noteId && $hasNoteField) {
         CRM_Core_BAO_Note::deleteRecord(['id' => $noteId]);
@@ -504,7 +495,7 @@ SELECT  event.event_full_text,
     SELECT  line.id as lineId,
             line.entity_id as entity_id,
             line.qty,
-            value.id as valueId,
+            value.id as price_field_value_id,
             value.count,
             field.html_type
       FROM  civicrm_line_item line
@@ -520,14 +511,13 @@ INNER JOIN  civicrm_price_field field       ON ( value.price_field_id = field.id
 
     $lineItem = CRM_Core_DAO::executeQuery($sql, [1 => [$eventId, 'Positive']]);
     while ($lineItem->fetch()) {
-      $count = $lineItem->count;
-      if (!$count) {
-        $count = 1;
-      }
-      if ($lineItem->html_type == 'Text') {
+      $id = (int) $lineItem->price_field_value_id;
+      $optionsCount[$id] ??= 0;
+      $count = $lineItem->count ?: 1;
+      if ($lineItem->html_type === 'Text') {
         $count *= $lineItem->qty;
       }
-      $optionsCount[$lineItem->valueId] = $count + ($optionsCount[$lineItem->valueId] ?? 0);
+      $optionsCount[$id] += $count;
     }
 
     return $optionsCount;
@@ -542,14 +532,13 @@ INNER JOIN  civicrm_price_field field       ON ( value.price_field_id = field.id
    * @param bool $checkPermission
    *   Is this a permissioned retrieval?
    *
-   * @deprecated only called from event search, but without most of the details
-   * returned. Event search should call stop using this & get the metadata
-   * a better way.
+   * @deprecated since 5.74 will be removed around 5.86
    *
    * @return array
    *   array of importable Fields
    */
   public static function &importableFields($contactType = 'Individual', $status = TRUE, $onlyParticipant = FALSE, $checkPermission = TRUE) {
+    CRM_Core_Error::deprecatedFunctionWarning('use apiv4');
     if (!self::$_importableFields) {
       if (!$onlyParticipant) {
         if (!$status) {
@@ -1001,7 +990,6 @@ WHERE cpf.price_set_id = %1 AND cpfv.label = (SELECT label from civicrm_price_fi
       $params[2] = [$discountedPriceFieldOptionID, 'Integer'];
     }
     else {
-      $feeLevel = current($feeLevel);
       $query = "SELECT cpfv.amount FROM `civicrm_price_field_value` cpfv
 LEFT JOIN civicrm_price_field cpf ON cpfv.price_field_id = cpf.id
 WHERE cpf.price_set_id = %1 AND cpfv.label LIKE %2";
@@ -1678,6 +1666,10 @@ WHERE    civicrm_participant.contact_id = {$contactID} AND
   public static function createDiscountTrxn($eventID, $contributionParams, $feeLevel, $discountedPriceFieldOptionID = NULL) {
     $financialTypeID = $contributionParams['contribution']->financial_type_id;
     $total_amount = $contributionParams['total_amount'];
+    if (is_array($feeLevel)) {
+      CRM_Core_Error::deprecatedFunctionWarning('array passed for string value');
+      $feeLevel = (string) current($feeLevel);
+    }
 
     $checkDiscount = CRM_Core_BAO_Discount::findSet($eventID, 'civicrm_event');
     if (!empty($checkDiscount)) {
